@@ -4,6 +4,10 @@
     <ProjectReference Include="..\IbmcKvm.Protocol\IbmcKvm.Protocol.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="DiscUtils.Iso9660" Version="0.16.13" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
