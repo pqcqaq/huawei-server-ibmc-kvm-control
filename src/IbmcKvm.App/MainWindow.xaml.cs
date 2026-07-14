@@ -1,10 +1,12 @@
 using System.Diagnostics;
 using System.IO;
 using System.Net.Security;
+using System.Security.Cryptography;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using IbmcKvm.App.Settings;
 using IbmcKvm.Core.Input;
 using IbmcKvm.Core.Session;
 using IbmcKvm.Core.Video;
@@ -19,6 +21,7 @@ public partial class MainWindow : Window, IDisposable
 {
     private readonly HidKeyboardState keyboard = new();
     private readonly Stopwatch frameClock = Stopwatch.StartNew();
+    private readonly EncryptedSettingsStore settingsStore = new();
     private KvmClientSession? session;
     private VirtualMediaController? virtualMediaController;
     private VirtualMediaWindow? virtualMediaWindow;
@@ -39,6 +42,7 @@ public partial class MainWindow : Window, IDisposable
     public MainWindow()
     {
         InitializeComponent();
+        LoadSavedConnectionSettings();
     }
 
     private async void ConnectButton_Click(object sender, RoutedEventArgs e)
@@ -55,11 +59,12 @@ public partial class MainWindow : Window, IDisposable
         SetStatus("正在建立 HTTPS 会话", "正在连接", Brushes.Goldenrod);
 
         var operation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var password = string.Empty;
         try
         {
             var endpoint = IbmcEndpoint.Parse(AddressTextBox.Text);
             var userName = UserNameTextBox.Text;
-            var password = PasswordInput.Password;
+            password = PasswordInput.Password;
             if (string.IsNullOrWhiteSpace(userName) || string.IsNullOrEmpty(password))
             {
                 throw new InvalidOperationException("请输入用户名和密码。");
@@ -98,12 +103,23 @@ public partial class MainWindow : Window, IDisposable
             frameConsumer = ConsumeFramesAsync(session, sessionLifetime.Token);
             diagnosticsConsumer = ConsumeDiagnosticsAsync(session, sessionLifetime.Token);
 
+            var settingsPersisted = PersistConnectionSettings(
+                AddressTextBox.Text.Trim(),
+                userName,
+                password,
+                mode);
+            password = string.Empty;
+            PasswordInput.Clear();
+
             SessionControlPanel.IsEnabled = true;
             VirtualMediaButton.IsEnabled = true;
             ConnectButton.Content = "断开连接";
             ConnectButton.IsEnabled = true;
             SetConnectionFormEnabled(false);
-            SetStatus($"已连接 {endpoint.Host}:{kvmPort}", "已连接", new SolidColorBrush(Color.FromRgb(21, 155, 101)));
+            var connectionStatus = settingsPersisted
+                ? $"已连接 {endpoint.Host}:{kvmPort}"
+                : $"已连接 {endpoint.Host}:{kvmPort}，但本地设置未能更新";
+            SetStatus(connectionStatus, "已连接", new SolidColorBrush(Color.FromRgb(21, 155, 101)));
             VideoHost.Focus();
         }
         catch (OperationCanceledException)
@@ -119,6 +135,7 @@ public partial class MainWindow : Window, IDisposable
         }
         finally
         {
+            password = string.Empty;
             operation.Dispose();
             if (session is null)
             {
@@ -314,6 +331,7 @@ public partial class MainWindow : Window, IDisposable
         ConnectButton.Content = "连接远程控制台";
         ConnectButton.IsEnabled = true;
         SetConnectionFormEnabled(true);
+        LoadSavedConnectionSettings();
         ViewerOverlay.Visibility = Visibility.Visible;
         VideoMetricsText.Text = "无视频信号";
         SetStatus("已断开", "未连接", Brushes.Gray);
@@ -635,6 +653,79 @@ public partial class MainWindow : Window, IDisposable
         PasswordInput.IsEnabled = enabled;
         ModeComboBox.IsEnabled = enabled;
         TrustCheckBox.IsEnabled = enabled;
+        RememberSettingsCheckBox.IsEnabled = enabled;
+        ClearSavedSettingsButton.IsEnabled = enabled;
+    }
+
+    private void LoadSavedConnectionSettings()
+    {
+        var settings = settingsStore.Load();
+        if (settings is null)
+        {
+            return;
+        }
+
+        AddressTextBox.Text = settings.Host;
+        UserNameTextBox.Text = settings.UserName;
+        PasswordInput.Password = settings.Password;
+        ModeComboBox.SelectedIndex = settings.ConnectionMode == ConnectionMode.Exclusive ? 1 : 0;
+        TrustCheckBox.IsChecked = settings.TrustSelfSignedCertificate;
+        RememberSettingsCheckBox.IsChecked = true;
+    }
+
+    private bool PersistConnectionSettings(
+        string host,
+        string userName,
+        string password,
+        ConnectionMode connectionMode)
+    {
+        if (RememberSettingsCheckBox.IsChecked != true)
+        {
+            return settingsStore.Delete();
+        }
+
+        try
+        {
+            settingsStore.Save(new ConnectionSettings(
+                host,
+                userName,
+                password,
+                connectionMode,
+                TrustCheckBox.IsChecked == true,
+                RememberSettings: true));
+            return true;
+        }
+        catch (Exception exception) when (exception is CryptographicException or IOException or
+                                               UnauthorizedAccessException or NotSupportedException or ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private void RememberSettingsCheckBox_Unchecked(object sender, RoutedEventArgs e)
+    {
+        if (!settingsStore.Delete())
+        {
+            RememberSettingsCheckBox.IsChecked = true;
+            SetStatus("无法删除本地连接设置，请检查文件权限。", HeaderStatusText.Text, StatusDot.Fill);
+        }
+    }
+
+    private void ClearSavedSettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!settingsStore.Delete())
+        {
+            SetStatus("无法删除本地连接设置，请检查文件权限。", HeaderStatusText.Text, StatusDot.Fill);
+            return;
+        }
+
+        RememberSettingsCheckBox.IsChecked = false;
+        AddressTextBox.Clear();
+        UserNameTextBox.Clear();
+        PasswordInput.Clear();
+        ModeComboBox.SelectedIndex = 0;
+        TrustCheckBox.IsChecked = false;
+        SetStatus("已清除本地保存的连接设置", HeaderStatusText.Text, StatusDot.Fill);
     }
 
     private void SetStatus(string footer, string header, Brush dotBrush)

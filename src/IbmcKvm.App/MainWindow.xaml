@@ -91,6 +91,16 @@
                                    Foreground="{StaticResource MutedBrush}" FontSize="10" TextWrapping="Wrap"
                                    Margin="22,4,0,0" />
 
+                        <CheckBox x:Name="RememberSettingsCheckBox" Margin="0,14,0,0"
+                                  VerticalContentAlignment="Center" Content="记住此连接" FontSize="12"
+                                  Unchecked="RememberSettingsCheckBox_Unchecked" />
+                        <TextBlock Text="地址、账号、密码和连接选项使用 Windows 当前用户加密后保存在本机。"
+                                   Foreground="{StaticResource MutedBrush}" FontSize="10" TextWrapping="Wrap"
+                                   Margin="22,4,0,0" />
+                        <Button x:Name="ClearSavedSettingsButton" Content="清除已保存设置"
+                                Style="{StaticResource BaseButton}" HorizontalAlignment="Left"
+                                Margin="22,8,0,0" Click="ClearSavedSettingsButton_Click" />
+
                         <Button x:Name="ConnectButton" Content="连接远程控制台" Style="{StaticResource PrimaryButton}"
                                 Margin="0,18,0,0" Click="ConnectButton_Click" />
 

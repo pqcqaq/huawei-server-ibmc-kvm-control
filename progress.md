@@ -33,6 +33,7 @@ Last updated: 2026-07-14
 - [x] Independent VMM TCP session with authentication, heartbeat, simultaneous devices, reconnect, and cleanup
 - [x] WPF virtual-media window with image/physical/directory sources, change/eject, progress, and confirmed USB reset
 - [x] Read-only target VMM capability query: valid 20-byte credential, 16-byte salt, suite 3, positive iterations, plain data mode
+- [x] Opt-in DPAPI-encrypted restoration of the last successful connection and explicit local-settings removal
 
 ## Pending
 
@@ -45,11 +46,11 @@ Last updated: 2026-07-14
 - Reverse artifact payload SHA-256: `238775201099AFFAF606DE26261A0057FD1E8613B2D0DC14CA9C687A969FEC1C`
 - Toolchain: .NET SDK 9.0.304; Windows WPF template available
 - `dotnet build IbmcKvm.slnx --configuration Release --no-restore`: passed, 0 warnings, 0 errors
-- `dotnet build IbmcKvm.slnx --configuration Release --no-restore`: passed, 0 warnings, 0 errors
-- `dotnet test IbmcKvm.slnx --configuration Release --no-build`: passed, 155 tests
+- `dotnet build IbmcKvm.slnx --configuration Release --no-restore -p:OutputPath=artifacts/solution-verify/`: passed, 0 warnings, 0 errors
+- `dotnet test IbmcKvm.slnx --configuration Release --no-build -p:OutputPath=artifacts/solution-verify/`: passed, 164 tests
   - Protocol: 77
   - Core: 58
-  - App/video/UI: 20
+  - App/video/UI/settings: 29
 - Legacy JPEG header oracle: all 10 table indexes match at 698 bytes each
 - Read-only hardware capture: 720×400, table index 6, 0 assembled-frame errors; visual inspection passed
 - Read-only VMM query: capability available; credential/salt lengths valid; suite 3; data encryption disabled by login flag

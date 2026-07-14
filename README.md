@@ -9,6 +9,7 @@ The application is being rebuilt from observed behavior and protocol analysis. I
 - No system-wide keyboard or mouse hooks.
 - No network I/O, decoding, or blocking waits on the WPF UI thread.
 - Passwords and session keys are never written to logs or project configuration.
+- Remembered connection settings are opt-in and encrypted with Windows DPAPI for the current user.
 - Every connection can be cancelled and has bounded timeouts.
 - Self-signed iBMC certificates require an explicit per-connection trust decision.
 
@@ -22,6 +23,7 @@ See `task_plan.md` and `progress.md` for the active implementation state.
 - Window-local USB HID keyboard input and absolute mouse input.
 - Ctrl+Alt+Delete, release-all-keys, screenshots, and full-screen viewing.
 - Power commands with a separate confirmation dialog. Hardware verification never invokes them.
+- Optional restoration of the last successful connection, including credentials and connection options.
 
 ## Implemented virtual-media functions
 
@@ -40,6 +42,6 @@ dotnet run --project src/IbmcKvm.App/IbmcKvm.App.csproj --configuration Release
 ```
 
 The built executable is under `src/IbmcKvm.App/bin/Release/net9.0-windows/win-x64/`.
-Credentials are entered at runtime and are not saved.
+Credentials are not saved by default. When **记住此连接** is selected, a successful connection stores a versioned DPAPI-encrypted file at `%LOCALAPPDATA%\IbmcKvm\connection-settings.bin`. Only the same Windows user can decrypt it. Unchecking the option or selecting **清除已保存设置** removes the file.
 
 Open **虚拟媒体** from the connected console toolbar. Optical and directory sources are always read-only. Closing the virtual-media window leaves current mounts active; disconnecting the KVM session closes VMM and deletes generated directory images.

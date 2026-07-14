@@ -18,6 +18,7 @@
 16. [x] Add the WPF virtual-media manager, reconnect, progress, status, and confirmed USB reset.
 17. [x] Validate target VMM capability without mounting, ejecting, resetting USB, or changing power state.
 18. [x] Run Release builds, protocol/core/app tests, sensitive-file checks, and documentation updates.
+19. [x] Add opt-in current-user DPAPI storage for the last successful connection, startup restoration, and explicit clearing.
 
 Deferred compatibility extensions: recording and hardware injection tests for keyboard/mouse. Destructive virtual-media hardware operations are implemented but are not exercised while the target session is restricted to read-only verification.
 
