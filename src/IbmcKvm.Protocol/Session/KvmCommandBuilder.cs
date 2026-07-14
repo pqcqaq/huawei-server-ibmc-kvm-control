@@ -44,19 +44,31 @@ public static class KvmCommandBuilder
 
     public static byte[] SetFrameRate(byte framesPerSecond) => [0x1C, framesPerSecond];
 
-    public static byte[] SetMouseMode(bool absolute) => [0x24, 0, absolute ? (byte)2 : (byte)1, 0, 0];
+    public static byte[] QueryMouseMode() => [0x24, 0, 2, 0, 0];
 
-    public static byte[] Keyboard(byte bladeNumber, ReadOnlySpan<byte> hidReport)
+    public static byte[] SetMouseMode(KvmMouseMode mode) => [0x24, 0, (byte)mode, 0, 0];
+
+    public static byte[] Keyboard(
+        byte bladeNumber,
+        ReadOnlySpan<byte> hidReport,
+        int codeKey,
+        KvmKeyboardEncoding encoding)
     {
         if (hidReport.Length != 8)
         {
             throw new ArgumentException("A boot-protocol keyboard report contains 8 bytes", nameof(hidReport));
         }
 
-        var payload = new byte[10];
+        var encodedReport = encoding switch
+        {
+            KvmKeyboardEncoding.LegacyPlain => hidReport.ToArray(),
+            KvmKeyboardEncoding.CodeKeyAes => KvmInputCipher.EncryptKeyboardReport(hidReport, codeKey),
+            _ => throw new ArgumentOutOfRangeException(nameof(encoding)),
+        };
+        var payload = new byte[2 + encodedReport.Length];
         payload[0] = 0x03;
         payload[1] = ValidateBlade(bladeNumber);
-        hidReport.CopyTo(payload.AsSpan(2));
+        encodedReport.CopyTo(payload.AsSpan(2));
         return payload;
     }
 

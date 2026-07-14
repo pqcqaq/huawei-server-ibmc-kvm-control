@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using IbmcKvm.App.Input;
 using IbmcKvm.App.Settings;
 using IbmcKvm.Core.Input;
 using IbmcKvm.Core.Session;
@@ -19,6 +20,10 @@ namespace IbmcKvm.App;
 
 public partial class MainWindow : Window, IDisposable
 {
+    private static readonly Brush InputDisconnectedBrush = CreateInputStateBrush(RemoteInputState.Disconnected);
+    private static readonly Brush InputFailedBrush = CreateInputStateBrush(RemoteInputState.ConnectionFailed);
+    private static readonly Brush InputInactiveBrush = CreateInputStateBrush(RemoteInputState.ConnectedInactive);
+    private static readonly Brush InputReadyBrush = CreateInputStateBrush(RemoteInputState.Ready);
     private readonly HidKeyboardState keyboard = new();
     private readonly Stopwatch frameClock = Stopwatch.StartNew();
     private readonly EncryptedSettingsStore settingsStore = new();
@@ -32,9 +37,14 @@ public partial class MainWindow : Window, IDisposable
     private EncodedVideoFrame? latestFrame;
     private BlockVideoDecoder? blockDecoder;
     private byte mouseButtons;
+    private ushort lastMouseX;
+    private ushort lastMouseY;
     private long lastMouseSend;
     private int renderedFrames;
     private bool fullScreen;
+    private bool hasLastMousePosition;
+    private bool connectionFailed;
+    private RemoteInputState remoteInputState = RemoteInputState.Disconnected;
     private WindowStyle previousWindowStyle;
     private WindowState previousWindowState;
     private ResizeMode previousResizeMode;
@@ -43,6 +53,7 @@ public partial class MainWindow : Window, IDisposable
     {
         InitializeComponent();
         LoadSavedConnectionSettings();
+        UpdateRemoteInputStatus();
     }
 
     private async void ConnectButton_Click(object sender, RoutedEventArgs e)
@@ -54,6 +65,8 @@ public partial class MainWindow : Window, IDisposable
         }
 
         SetConnectionFormEnabled(false);
+        connectionFailed = false;
+        UpdateRemoteInputStatus();
         ConnectButton.IsEnabled = false;
         ConnectButton.Content = "正在连接…";
         SetStatus("正在建立 HTTPS 会话", "正在连接", Brushes.Goldenrod);
@@ -121,16 +134,21 @@ public partial class MainWindow : Window, IDisposable
                 : $"已连接 {endpoint.Host}:{kvmPort}，但本地设置未能更新";
             SetStatus(connectionStatus, "已连接", new SolidColorBrush(Color.FromRgb(21, 155, 101)));
             VideoHost.Focus();
+            UpdateRemoteInputStatus();
         }
         catch (OperationCanceledException)
         {
             await DisconnectAsync(updateInterface: true);
-            SetStatus("连接已取消或超时", "未连接", Brushes.Gray);
+            connectionFailed = true;
+            SetStatus("连接已取消或超时", "连接失败", InputFailedBrush);
+            UpdateRemoteInputStatus();
         }
         catch (Exception exception)
         {
             await DisconnectAsync(updateInterface: true);
-            SetStatus(exception.Message, "连接失败", new SolidColorBrush(Color.FromRgb(198, 74, 64)));
+            connectionFailed = true;
+            SetStatus(exception.Message, "连接失败", InputFailedBrush);
+            UpdateRemoteInputStatus();
             MessageBox.Show(this, exception.Message, "无法连接 iBMC", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
@@ -207,7 +225,11 @@ public partial class MainWindow : Window, IDisposable
             if (!cancellationToken.IsCancellationRequested && sourceSession.Failure is not null)
             {
                 await Dispatcher.InvokeAsync(() =>
-                    SetStatus(sourceSession.Failure.Message, "连接中断", new SolidColorBrush(Color.FromRgb(198, 74, 64))));
+                {
+                    connectionFailed = true;
+                    SetStatus(sourceSession.Failure.Message, "连接中断", InputFailedBrush);
+                    UpdateRemoteInputStatus();
+                });
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -261,6 +283,7 @@ public partial class MainWindow : Window, IDisposable
         latestFrame = frame;
         ViewerOverlay.Visibility = Visibility.Collapsed;
         ScreenshotButton.IsEnabled = true;
+        UpdateRemoteInputStatus();
 
         renderedFrames++;
         var elapsed = frameClock.Elapsed.TotalSeconds;
@@ -320,6 +343,8 @@ public partial class MainWindow : Window, IDisposable
 
         keyboard.Clear();
         mouseButtons = 0;
+        hasLastMousePosition = false;
+        Mouse.Capture(null);
         if (!updateInterface)
         {
             return;
@@ -328,6 +353,9 @@ public partial class MainWindow : Window, IDisposable
         SessionControlPanel.IsEnabled = false;
         VirtualMediaButton.IsEnabled = false;
         ScreenshotButton.IsEnabled = false;
+        latestFrame = null;
+        blockDecoder = null;
+        connectionFailed = false;
         ConnectButton.Content = "连接远程控制台";
         ConnectButton.IsEnabled = true;
         SetConnectionFormEnabled(true);
@@ -335,11 +363,12 @@ public partial class MainWindow : Window, IDisposable
         ViewerOverlay.Visibility = Visibility.Visible;
         VideoMetricsText.Text = "无视频信号";
         SetStatus("已断开", "未连接", Brushes.Gray);
+        UpdateRemoteInputStatus();
     }
 
     private async void VideoHost_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (session is null)
+        if (!CanSendRemoteInput)
         {
             return;
         }
@@ -357,7 +386,7 @@ public partial class MainWindow : Window, IDisposable
 
     private async void VideoHost_PreviewKeyUp(object sender, KeyEventArgs e)
     {
-        if (session is null)
+        if (!CanSendRemoteInput)
         {
             return;
         }
@@ -373,13 +402,24 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
-    private async void VideoHost_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    private void VideoHost_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) =>
+        UpdateRemoteInputStatus();
+
+    private void VideoHost_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) =>
+        UpdateRemoteInputStatus();
+
+    private void VideoHost_MouseEnter(object sender, MouseEventArgs e)
     {
-        if (session is not null)
+        if (session is not null && IsActive)
         {
-            await SendKeyboardSafelyAsync(keyboard.Clear());
+            VideoHost.Focus();
         }
+
+        UpdateRemoteInputStatus();
     }
+
+    private void VideoHost_MouseLeave(object sender, MouseEventArgs e) =>
+        UpdateRemoteInputStatus();
 
     private async void VideoHost_PreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
@@ -389,6 +429,12 @@ public partial class MainWindow : Window, IDisposable
         }
 
         VideoHost.Focus();
+        UpdateRemoteInputStatus();
+        if (!CanSendRemoteInput)
+        {
+            return;
+        }
+
         mouseButtons |= e.ChangedButton switch
         {
             MouseButton.Left => (byte)1,
@@ -420,12 +466,21 @@ public partial class MainWindow : Window, IDisposable
             Mouse.Capture(null);
         }
         e.Handled = true;
-        await SendMouseAtCurrentPositionAsync(e.GetPosition(VideoHost), 0);
+        var point = e.GetPosition(VideoHost);
+        if (TryMapPointer(point, out _, out _))
+        {
+            await SendMouseAtCurrentPositionAsync(point, 0);
+        }
+        else
+        {
+            await SendMouseAtLastPositionAsync();
+        }
     }
 
     private async void VideoHost_PreviewMouseMove(object sender, MouseEventArgs e)
     {
-        if (session is null || latestFrame is null)
+        UpdateRemoteInputStatus();
+        if (!CanSendRemoteInput)
         {
             return;
         }
@@ -442,7 +497,7 @@ public partial class MainWindow : Window, IDisposable
 
     private async void VideoHost_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        if (session is null)
+        if (!CanSendRemoteInput)
         {
             return;
         }
@@ -461,11 +516,58 @@ public partial class MainWindow : Window, IDisposable
 
         try
         {
+            lastMouseX = x;
+            lastMouseY = y;
+            hasLastMousePosition = true;
             await activeSession.SendAbsoluteMouseAsync(mouseButtons, x, y, wheel);
         }
         catch (Exception exception)
         {
-            SetStatus(exception.Message, "输入发送失败", new SolidColorBrush(Color.FromRgb(198, 74, 64)));
+            MarkConnectionFailed(exception, "输入发送失败");
+        }
+    }
+
+    private async Task SendMouseAtLastPositionAsync()
+    {
+        var activeSession = session;
+        if (activeSession is null || !hasLastMousePosition)
+        {
+            return;
+        }
+
+        try
+        {
+            await activeSession.SendAbsoluteMouseAsync(mouseButtons, lastMouseX, lastMouseY);
+        }
+        catch (Exception exception)
+        {
+            MarkConnectionFailed(exception, "输入发送失败");
+        }
+    }
+
+    private async Task ReleaseRemoteInputAsync()
+    {
+        var activeSession = session;
+        var releaseMouse = mouseButtons != 0 && hasLastMousePosition;
+        mouseButtons = 0;
+        Mouse.Capture(null);
+        var releaseKeyboard = keyboard.Clear();
+        if (activeSession is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await activeSession.SendKeyboardAsync(releaseKeyboard);
+            if (releaseMouse)
+            {
+                await activeSession.SendAbsoluteMouseAsync(0, lastMouseX, lastMouseY);
+            }
+        }
+        catch (Exception exception)
+        {
+            MarkConnectionFailed(exception, "输入释放失败");
         }
     }
 
@@ -508,7 +610,7 @@ public partial class MainWindow : Window, IDisposable
         }
         catch (Exception exception)
         {
-            SetStatus(exception.Message, "输入发送失败", new SolidColorBrush(Color.FromRgb(198, 74, 64)));
+            MarkConnectionFailed(exception, "输入发送失败");
         }
     }
 
@@ -624,6 +726,19 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
+    private void Window_Activated(object? sender, EventArgs e)
+    {
+        if (session is not null && VideoHost.IsMouseOver)
+        {
+            VideoHost.Focus();
+        }
+
+        UpdateRemoteInputStatus();
+    }
+
+    private void Window_Deactivated(object? sender, EventArgs e) =>
+        UpdateRemoteInputStatus();
+
     private async void Window_Closed(object? sender, EventArgs e)
     {
         try
@@ -655,6 +770,69 @@ public partial class MainWindow : Window, IDisposable
         TrustCheckBox.IsEnabled = enabled;
         RememberSettingsCheckBox.IsEnabled = enabled;
         ClearSavedSettingsButton.IsEnabled = enabled;
+    }
+
+    private bool CanSendRemoteInput => GetRemoteInputState() == RemoteInputState.Ready;
+
+    private RemoteInputState GetRemoteInputState()
+    {
+        var pointerOverRemoteFrame = VideoHost.IsMouseOver &&
+                                     TryMapPointer(Mouse.GetPosition(VideoHost), out _, out _);
+        return RemoteInputAvailability.Resolve(
+            isConnected: session is not null,
+            connectionFailed,
+            hasVideoFrame: latestFrame is not null,
+            isPointerInsideViewer: pointerOverRemoteFrame,
+            isViewerFocused: VideoHost.IsKeyboardFocusWithin,
+            isWindowActive: IsActive);
+    }
+
+    private void UpdateRemoteInputStatus()
+    {
+        var nextState = GetRemoteInputState();
+        var shouldRelease = remoteInputState == RemoteInputState.Ready &&
+                            nextState != RemoteInputState.Ready &&
+                            session is not null;
+        remoteInputState = nextState;
+        (InputStatusDot.Fill, InputStatusText.Text) = nextState switch
+        {
+            RemoteInputState.Disconnected => (InputDisconnectedBrush, "未连接"),
+            RemoteInputState.ConnectionFailed => (InputFailedBrush, "连接失败"),
+            RemoteInputState.Ready => (InputReadyBrush, "输入已启用"),
+            _ => (InputInactiveBrush, GetInactiveInputStatus()),
+        };
+
+        if (shouldRelease)
+        {
+            _ = ReleaseRemoteInputAsync();
+        }
+    }
+
+    private string GetInactiveInputStatus()
+    {
+        if (latestFrame is null)
+        {
+            return "已连接，等待视频";
+        }
+
+        if (!IsActive)
+        {
+            return "已连接，窗口未激活";
+        }
+
+        if (!VideoHost.IsMouseOver || !TryMapPointer(Mouse.GetPosition(VideoHost), out _, out _))
+        {
+            return "已连接，鼠标移入远程画面后可输入";
+        }
+
+        return "已连接，等待画面焦点";
+    }
+
+    private void MarkConnectionFailed(Exception exception, string header)
+    {
+        connectionFailed = true;
+        SetStatus(exception.Message, header, InputFailedBrush);
+        UpdateRemoteInputStatus();
     }
 
     private void LoadSavedConnectionSettings()
@@ -739,6 +917,13 @@ public partial class MainWindow : Window, IDisposable
     {
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         return KeyInterop.VirtualKeyFromKey(key);
+    }
+
+    private static SolidColorBrush CreateInputStateBrush(RemoteInputState state)
+    {
+        var brush = new SolidColorBrush(RemoteInputAvailability.GetIndicatorColor(state));
+        brush.Freeze();
+        return brush;
     }
 
     private static string GetLoginError(IbmcLoginResponse response) => response.Error switch

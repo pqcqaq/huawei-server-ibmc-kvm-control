@@ -21,6 +21,8 @@ See `task_plan.md` and `progress.md` for the active implementation state.
 - Shared or exclusive KVM sessions with negotiated cipher-suite selection.
 - Huawei 64×64 JPEG/RLE video blocks, differential frames, and resolution changes.
 - Window-local USB HID keyboard input and absolute mouse input.
+- Modern iBMC input compatibility: code-key AES keyboard reports and confirmed absolute mouse mode.
+- Four-color input indicator in the lower-left status bar: gray disconnected, red failed, blue connected/inactive, green ready.
 - Ctrl+Alt+Delete, release-all-keys, screenshots, and full-screen viewing.
 - Power commands with a separate confirmation dialog. Hardware verification never invokes them.
 - Optional restoration of the last successful connection, including credentials and connection options.
@@ -45,3 +47,5 @@ The built executable is under `src/IbmcKvm.App/bin/Release/net9.0-windows/win-x6
 Credentials are not saved by default. When **记住此连接** is selected, a successful connection stores a versioned DPAPI-encrypted file at `%LOCALAPPDATA%\IbmcKvm\connection-settings.bin`. Only the same Windows user can decrypt it. Unchecking the option or selecting **清除已保存设置** removes the file.
 
 Open **虚拟媒体** from the connected console toolbar. Optical and directory sources are always read-only. Closing the virtual-media window leaves current mounts active; disconnecting the KVM session closes VMM and deletes generated directory images.
+
+Move the pointer over the actual remote image to activate input. The lower-left indicator turns green only when the window, viewer focus, video frame, and pointer position all allow keyboard and mouse events to be sent. Moving outside the remote image releases held remote keys/buttons and changes the indicator to blue.

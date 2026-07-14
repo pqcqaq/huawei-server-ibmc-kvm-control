@@ -25,7 +25,8 @@ public sealed record KvmConnectionOptions(
     bool Encrypted = false,
     string? ExtendedVerifyValue = null,
     byte VirtualMediaBladeNumber = 0,
-    bool VirtualMediaEncrypted = true);
+    bool VirtualMediaEncrypted = true,
+    KvmKeyboardEncoding KeyboardEncoding = KvmKeyboardEncoding.CodeKeyAes);
 
 public sealed class KvmVirtualMediaEndpoint
 {
@@ -96,6 +97,8 @@ public sealed class KvmClientSession : IAsyncDisposable
     private readonly TaskCompletionSource<IReadOnlyList<KvmCipherSuite>> cipherSuites =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource<byte> connectionState =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<KvmMouseMode> mouseModeState =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource firstVideoPacket =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -181,8 +184,10 @@ public sealed class KvmClientSession : IAsyncDisposable
             await session.SendAsync(KvmCommandBuilder.ConnectBlade(options.BladeNumber, options.ColorDepth), cancellationToken)
                 .ConfigureAwait(false);
             await session.SendAsync(KvmCommandBuilder.SetFrameRate(35), cancellationToken).ConfigureAwait(false);
-            await session.SendAsync(KvmCommandBuilder.SetMouseMode(absolute: true), cancellationToken).ConfigureAwait(false);
+            await session.SendAsync(KvmCommandBuilder.SetMouseMode(KvmMouseMode.Absolute), cancellationToken)
+                .ConfigureAwait(false);
             await session.WaitForHandshakeAsync(cancellationToken).ConfigureAwait(false);
+            await session.WaitForAbsoluteMouseModeAsync(cancellationToken).ConfigureAwait(false);
             session.State = KvmSessionState.Connected;
             return session;
         }
@@ -203,7 +208,9 @@ public sealed class KvmClientSession : IAsyncDisposable
     }
 
     public ValueTask SendKeyboardAsync(ReadOnlyMemory<byte> report, CancellationToken cancellationToken = default) =>
-        SendAsync(KvmCommandBuilder.Keyboard(options.BladeNumber, report.Span), cancellationToken);
+        SendAsync(
+            KvmCommandBuilder.Keyboard(options.BladeNumber, report.Span, options.CodeKey, options.KeyboardEncoding),
+            cancellationToken);
 
     public ValueTask SendAbsoluteMouseAsync(
         byte buttons,
@@ -354,6 +361,21 @@ public sealed class KvmClientSession : IAsyncDisposable
                     continue;
                 }
 
+                if (packet.Command == 0x25 && packet.Payload.Length >= 3)
+                {
+                    var rawMode = packet.Payload.Span[2];
+                    if (rawMode <= (byte)KvmMouseMode.Absolute)
+                    {
+                        mouseModeState.TrySetResult((KvmMouseMode)rawMode);
+                    }
+                    else
+                    {
+                        mouseModeState.TrySetException(
+                            new InvalidDataException($"The iBMC returned an invalid mouse mode ({rawMode})."));
+                    }
+                    continue;
+                }
+
                 if (packet.Command == 0x32)
                 {
                     ProcessVirtualMediaCredential(packet.Payload.Span);
@@ -464,10 +486,31 @@ public sealed class KvmClientSession : IAsyncDisposable
         throw new TimeoutException("The KVM TCP connection opened, but the iBMC did not acknowledge the video handshake.");
     }
 
+    private async Task WaitForAbsoluteMouseModeAsync(CancellationToken cancellationToken)
+    {
+        KvmMouseMode mode;
+        try
+        {
+            mode = await mouseModeState.Task
+                .WaitAsync(TimeSpan.FromSeconds(3), cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (TimeoutException exception)
+        {
+            throw new TimeoutException("The iBMC did not confirm absolute mouse mode.", exception);
+        }
+
+        if (mode != KvmMouseMode.Absolute)
+        {
+            throw new InvalidOperationException($"The iBMC did not enter absolute mouse mode (mode {(byte)mode}).");
+        }
+    }
+
     private void SetFailure(Exception exception)
     {
         Failure ??= exception;
         State = KvmSessionState.Faulted;
+        mouseModeState.TrySetException(exception);
         virtualMediaCredential.TrySetException(exception);
         virtualMediaPort.TrySetException(exception);
         lifetime.Cancel();

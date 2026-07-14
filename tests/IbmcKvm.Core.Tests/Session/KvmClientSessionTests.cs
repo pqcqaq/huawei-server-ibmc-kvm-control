@@ -2,12 +2,73 @@ using System.Buffers.Binary;
 using System.Net;
 using System.Net.Sockets;
 using IbmcKvm.Core.Session;
+using IbmcKvm.Protocol.Session;
 using IbmcKvm.Protocol.Wire;
 
 namespace IbmcKvm.Core.Tests.Session;
 
 public sealed class KvmClientSessionTests
 {
+    [Fact]
+    public async Task RejectsTheSessionWhenAbsoluteMouseModeIsNotConfirmed()
+    {
+        var listener = StartListener();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var serverTask = RunServerAsync(
+            listener,
+            (stream, cancellationToken) => CompleteHandshakeAsync(
+                stream,
+                cancellationToken,
+                confirmedMouseMode: KvmMouseMode.Relative),
+            timeout.Token);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            KvmClientSession.ConnectAsync(
+                new KvmConnectionOptions("127.0.0.1", GetPort(listener), 0x01020304),
+                timeout.Token));
+
+        Assert.Contains("absolute mouse mode", exception.Message, StringComparison.OrdinalIgnoreCase);
+        await serverTask;
+    }
+
+    [Fact]
+    public async Task SendsEncryptedKeyboardAndAbsoluteMouseForTheModernSession()
+    {
+        var listener = StartListener();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var serverTask = RunServerAsync(listener, async (stream, cancellationToken) =>
+        {
+            await CompleteHandshakeAsync(stream, cancellationToken);
+            byte[]? keyboard = null;
+            byte[]? mouse = null;
+            while (keyboard is null || mouse is null)
+            {
+                var payload = await ReadOutgoingPayloadAsync(stream, cancellationToken);
+                if (payload[0] == 0x03)
+                {
+                    keyboard = payload;
+                }
+                else if (payload[0] == 0x05)
+                {
+                    mouse = payload;
+                }
+            }
+
+            Assert.Equal(
+                Convert.FromHexString("03015B2D00AAA634E6CF0E5F37283142DFB8"),
+                keyboard);
+            Assert.Equal(Convert.FromHexString("0501030BB805DCFF"), mouse);
+        }, timeout.Token);
+
+        await using var session = await KvmClientSession.ConnectAsync(
+            new KvmConnectionOptions("127.0.0.1", GetPort(listener), 0x01020304),
+            timeout.Token);
+
+        await session.SendKeyboardAsync(Convert.FromHexString("05004C0000000000"), timeout.Token);
+        await session.SendAbsoluteMouseAsync(3, 3000, 1500, -1, timeout.Token);
+        await serverTask;
+    }
+
     [Fact]
     public async Task QueriesVirtualMediaCredentialSaltAndPort()
     {
@@ -112,10 +173,29 @@ public sealed class KvmClientSessionTests
         }
     }
 
-    private static async Task CompleteHandshakeAsync(NetworkStream stream, CancellationToken cancellationToken)
+    private static async Task CompleteHandshakeAsync(
+        NetworkStream stream,
+        CancellationToken cancellationToken,
+        KvmMouseMode confirmedMouseMode = KvmMouseMode.Absolute)
     {
-        await ReadUntilCommandAsync(stream, 0x06, cancellationToken);
+        byte[]? connect = null;
+        byte[]? mouseMode = null;
+        while (connect is null || mouseMode is null)
+        {
+            var payload = await ReadOutgoingPayloadAsync(stream, cancellationToken);
+            if (payload[0] == 0x06)
+            {
+                connect = payload;
+            }
+            else if (payload[0] == 0x24)
+            {
+                mouseMode = payload;
+            }
+        }
+
+        Assert.Equal(new byte[] { 0x24, 0, 1, 0, 0 }, mouseMode);
         await stream.WriteAsync(BuildIncoming(0x08, 1, 0), cancellationToken);
+        await stream.WriteAsync(BuildIncoming(0x25, 1, (byte)confirmedMouseMode), cancellationToken);
     }
 
     private static async Task<IReadOnlyList<byte>> ReadUntilVirtualMediaQueryAsync(

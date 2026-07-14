@@ -9,6 +9,8 @@
         Width="1280" Height="800" MinWidth="980" MinHeight="640"
         Background="{StaticResource CanvasBrush}"
         WindowStartupLocation="CenterScreen"
+        Activated="Window_Activated"
+        Deactivated="Window_Deactivated"
         Closed="Window_Closed">
     <Grid>
         <Grid.RowDefinitions>
@@ -139,7 +141,8 @@
 
             <Grid x:Name="VideoHost" Grid.Column="2" Background="#090B0A" Focusable="True"
                   PreviewKeyDown="VideoHost_PreviewKeyDown" PreviewKeyUp="VideoHost_PreviewKeyUp"
-                  LostKeyboardFocus="VideoHost_LostKeyboardFocus"
+                  GotKeyboardFocus="VideoHost_GotKeyboardFocus" LostKeyboardFocus="VideoHost_LostKeyboardFocus"
+                  MouseEnter="VideoHost_MouseEnter" MouseLeave="VideoHost_MouseLeave"
                   PreviewMouseDown="VideoHost_PreviewMouseDown" PreviewMouseUp="VideoHost_PreviewMouseUp"
                   PreviewMouseMove="VideoHost_PreviewMouseMove" PreviewMouseWheel="VideoHost_PreviewMouseWheel">
                 <Image x:Name="RemoteImage" Stretch="Uniform" SnapsToDevicePixels="True"
@@ -166,10 +169,16 @@
 
         <Border Grid.Row="2" Background="#DADCD7" BorderBrush="#C1C5C0" BorderThickness="0,1,0,0">
             <DockPanel Margin="10,0">
-                <TextBlock x:Name="FooterStatusText" Text="就绪" VerticalAlignment="Center"
-                           Foreground="#44504B" FontSize="10" />
                 <TextBlock DockPanel.Dock="Right" Text="x64 · .NET 9 · 窗口内输入" VerticalAlignment="Center"
                            Foreground="#68736E" FontSize="10" />
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Ellipse x:Name="InputStatusDot" Width="8" Height="8" Fill="#77827D" Margin="0,0,7,0" />
+                    <TextBlock x:Name="InputStatusText" Text="未连接" VerticalAlignment="Center"
+                               Foreground="#44504B" FontSize="10" />
+                    <Border Width="1" Height="12" Background="#B8BDB8" Margin="9,0" />
+                    <TextBlock x:Name="FooterStatusText" Text="就绪" VerticalAlignment="Center"
+                               Foreground="#44504B" FontSize="10" />
+                </StackPanel>
             </DockPanel>
         </Border>
     </Grid>

@@ -34,10 +34,11 @@ Last updated: 2026-07-14
 - [x] WPF virtual-media window with image/physical/directory sources, change/eject, progress, and confirmed USB reset
 - [x] Read-only target VMM capability query: valid 20-byte credential, 16-byte salt, suite 3, positive iterations, plain data mode
 - [x] Opt-in DPAPI-encrypted restoration of the last successful connection and explicit local-settings removal
+- [x] Modern input fix: code-key AES keyboard packets, acknowledged absolute mouse mode, focus-safe release, and four-color input readiness indicator
+- [x] Non-destructive target input validation: encrypted Shift press/release, mouse movement, and live blue/green readiness transitions without clicks or characters
 
 ## Pending
 
-- [ ] Hardware keyboard/mouse injection validation (not run under the read-only constraint)
 - [ ] Optional recording extension
 - [ ] Destructive target validation of mount/eject/USB reset (intentionally not run under the read-only constraint)
 
@@ -47,10 +48,12 @@ Last updated: 2026-07-14
 - Toolchain: .NET SDK 9.0.304; Windows WPF template available
 - `dotnet build IbmcKvm.slnx --configuration Release --no-restore`: passed, 0 warnings, 0 errors
 - `dotnet build IbmcKvm.slnx --configuration Release --no-restore -p:OutputPath=artifacts/solution-verify/`: passed, 0 warnings, 0 errors
-- `dotnet test IbmcKvm.slnx --configuration Release --no-build -p:OutputPath=artifacts/solution-verify/`: passed, 164 tests
-  - Protocol: 77
-  - Core: 58
-  - App/video/UI/settings: 29
+- `dotnet test IbmcKvm.slnx --configuration Release --no-build -p:OutputPath=artifacts/input-solution-verify/`: passed, 179 tests
+  - Protocol: 79
+  - Core: 60
+  - App/video/UI/settings/input: 40
+- Java input oracle: AES-CBC keyboard payload vectors match `com.kvm.AESHandler.encry` from the original JAR
+- Live target input verification: 720×400 video, absolute-mode acknowledgement, encrypted key release and Shift press/release, mouse movement, blue inactive state, green ready state, no connection failure
 - Legacy JPEG header oracle: all 10 table indexes match at 698 bytes each
 - Read-only hardware capture: 720×400, table index 6, 0 assembled-frame errors; visual inspection passed
 - Read-only VMM query: capability available; credential/salt lengths valid; suite 3; data encryption disabled by login flag
