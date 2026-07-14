@@ -1,0 +1,14 @@
+bin/
+obj/
+.vs/
+.idea/
+TestResults/
+artifacts/
+publish/
+*.user
+*.suo
+*.pfx
+*.snk
+appsettings.local.json
+credentials.json
+
