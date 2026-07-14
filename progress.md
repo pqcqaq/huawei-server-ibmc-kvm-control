@@ -4,7 +4,7 @@ Last updated: 2026-07-14
 
 ## In progress
 
-- [ ] Phase 2: HTTPS login, endpoint parsing, and session negotiation
+- [ ] Phase 4: Video packet reconstruction and WPF frame rendering
 
 ## Completed
 
@@ -15,11 +15,15 @@ Last updated: 2026-07-14
 - [x] .NET 9 solution scaffolded with WPF app, protocol/core libraries, and xUnit projects
 - [x] Release/x64 build passes with zero warnings
 - [x] Architecture tests prevent protocol/core layers from referencing desktop UI frameworks
+- [x] HTTPS login request/response parsing with redacted diagnostics
+- [x] CRC-16-H, legacy packet encoding, and incremental stream framing
+- [x] Bounded asynchronous TCP connection with cancellation and loopback integration tests
 
 ## Pending
 
-- [ ] HTTPS login and session negotiation
-- [ ] KVM packet framing and authentication
+- [x] HTTPS login and session negotiation
+- [x] KVM packet framing and asynchronous transport
+- [ ] KVM authentication packet exchange
 - [ ] Video decode and frame rendering
 - [ ] Window-local keyboard and mouse input
 - [ ] Reconnect, diagnostics, and cancellation
@@ -32,3 +36,4 @@ Last updated: 2026-07-14
 - Toolchain: .NET SDK 9.0.304; Windows WPF template available
 - `dotnet build IbmcKvm.slnx --configuration Release --no-restore`: passed, 0 warnings, 0 errors
 - `dotnet test IbmcKvm.slnx --configuration Release --no-build`: passed, 2 tests
+- `dotnet test tests/IbmcKvm.Protocol.Tests/IbmcKvm.Protocol.Tests.csproj --configuration Release`: passed, 42 tests
