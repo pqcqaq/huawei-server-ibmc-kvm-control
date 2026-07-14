@@ -36,6 +36,9 @@ Last updated: 2026-07-14
 - [x] Opt-in DPAPI-encrypted restoration of the last successful connection and explicit local-settings removal
 - [x] Modern input fix: code-key AES keyboard packets, acknowledged absolute mouse mode, focus-safe release, and four-color input readiness indicator
 - [x] Non-destructive target input validation: encrypted Shift press/release, mouse movement, and live blue/green readiness transitions without clicks or characters
+- [x] Redesigned two-window UX: independent login/loading/error window, full-area video console, pinnable auto-hide toolbar, and disconnect-to-login flow
+- [x] Hardened input focus acquisition on window activation, pointer entry, and first mouse click
+- [x] Published and reconnected the redesigned client; verified pinned toolbar, 720×400 video, green input readiness, absolute mouse movement, and Shift press/release without clicks, characters, media, or power actions
 
 ## Pending
 
@@ -54,6 +57,7 @@ Last updated: 2026-07-14
   - App/video/UI/settings/input: 40
 - Java input oracle: AES-CBC keyboard payload vectors match `com.kvm.AESHandler.encry` from the original JAR
 - Live target input verification: 720×400 video, absolute-mode acknowledgement, encrypted key release and Shift press/release, mouse movement, blue inactive state, green ready state, no connection failure
+- Redesigned UI verification: high-DPI login layout and connected full-video console inspected; pinned toolbar visible; 720×400 video stable; final input probe remained green after mouse movement and Shift press/release
 - Legacy JPEG header oracle: all 10 table indexes match at 698 bytes each
 - Read-only hardware capture: 720×400, table index 6, 0 assembled-frame errors; visual inspection passed
 - Read-only VMM query: capability available; credential/salt lengths valid; suite 3; data encryption disabled by login flag

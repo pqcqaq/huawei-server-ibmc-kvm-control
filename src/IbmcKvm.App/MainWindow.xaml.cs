@@ -1,18 +1,17 @@
 using System.Diagnostics;
 using System.IO;
-using System.Net.Security;
-using System.Security.Cryptography;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using IbmcKvm.App.Input;
-using IbmcKvm.App.Settings;
+using IbmcKvm.App.Ui;
 using IbmcKvm.Core.Input;
 using IbmcKvm.Core.Session;
 using IbmcKvm.Core.Video;
 using IbmcKvm.Core.VirtualMedia;
-using IbmcKvm.Protocol.Login;
 using IbmcKvm.Protocol.Session;
 using Microsoft.Win32;
 
@@ -26,7 +25,8 @@ public partial class MainWindow : Window, IDisposable
     private static readonly Brush InputReadyBrush = CreateInputStateBrush(RemoteInputState.Ready);
     private readonly HidKeyboardState keyboard = new();
     private readonly Stopwatch frameClock = Stopwatch.StartNew();
-    private readonly EncryptedSettingsStore settingsStore = new();
+    private readonly FloatingToolbarState toolbarState = new();
+    private readonly DispatcherTimer toolbarHideTimer;
     private KvmClientSession? session;
     private VirtualMediaController? virtualMediaController;
     private VirtualMediaWindow? virtualMediaWindow;
@@ -44,160 +44,31 @@ public partial class MainWindow : Window, IDisposable
     private bool fullScreen;
     private bool hasLastMousePosition;
     private bool connectionFailed;
+    private int disconnectStarted;
     private RemoteInputState remoteInputState = RemoteInputState.Disconnected;
     private WindowStyle previousWindowStyle;
     private WindowState previousWindowState;
     private ResizeMode previousResizeMode;
 
-    public MainWindow()
+    public MainWindow(KvmClientSession connectedSession, string endpointDisplay, bool settingsPersisted)
     {
+        ArgumentNullException.ThrowIfNull(connectedSession);
+        ArgumentException.ThrowIfNullOrWhiteSpace(endpointDisplay);
         InitializeComponent();
-        LoadSavedConnectionSettings();
+        session = connectedSession;
+        virtualMediaController = new VirtualMediaController(connectedSession);
+        sessionLifetime = new CancellationTokenSource();
+        frameConsumer = ConsumeFramesAsync(connectedSession, sessionLifetime.Token);
+        diagnosticsConsumer = ConsumeDiagnosticsAsync(connectedSession, sessionLifetime.Token);
+        toolbarHideTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(900) };
+        toolbarHideTimer.Tick += ToolbarHideTimer_Tick;
+        toolbarState.SetPinned(isPinned: true);
+        ApplyToolbarState();
+        ConnectedEndpointText.Text = endpointDisplay;
+        SetStatus(
+            settingsPersisted ? $"已连接 {endpointDisplay}" : $"已连接 {endpointDisplay}，本地设置未能更新",
+            settingsPersisted ? InputReadyBrush : Brushes.Goldenrod);
         UpdateRemoteInputStatus();
-    }
-
-    private async void ConnectButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (session is not null)
-        {
-            await DisconnectAsync(updateInterface: true);
-            return;
-        }
-
-        SetConnectionFormEnabled(false);
-        connectionFailed = false;
-        UpdateRemoteInputStatus();
-        ConnectButton.IsEnabled = false;
-        ConnectButton.Content = "正在连接…";
-        SetStatus("正在建立 HTTPS 会话", "正在连接", Brushes.Goldenrod);
-
-        var operation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var password = string.Empty;
-        try
-        {
-            var endpoint = IbmcEndpoint.Parse(AddressTextBox.Text);
-            var userName = UserNameTextBox.Text;
-            password = PasswordInput.Password;
-            if (string.IsNullOrWhiteSpace(userName) || string.IsNullOrEmpty(password))
-            {
-                throw new InvalidOperationException("请输入用户名和密码。");
-            }
-
-            var mode = ModeComboBox.SelectedIndex == 1 ? ConnectionMode.Exclusive : ConnectionMode.Shared;
-            var (policy, fingerprint) = await ResolveCertificatePolicyAsync(endpoint, operation.Token);
-            using var httpClient = IbmcLoginClient.CreateHttpClient(policy, fingerprint);
-            var loginClient = new IbmcLoginClient(httpClient, TimeSpan.FromSeconds(20));
-            var login = await loginClient.LoginAsync(
-                endpoint,
-                new LoginRequest(userName, password, mode),
-                operation.Token);
-            PasswordInput.Clear();
-
-            if (!login.IsSuccess)
-            {
-                throw new InvalidOperationException(GetLoginError(login));
-            }
-
-            var verificationKey = SessionVerificationKey.Parse(
-                login.VerifyValue ?? throw new FormatException("登录响应缺少 KVM 校验值。"));
-            var kvmPort = login.KvmPort ?? throw new FormatException("登录响应缺少 KVM 端口。");
-
-            sessionLifetime = new CancellationTokenSource();
-            session = await KvmClientSession.ConnectAsync(
-                new KvmConnectionOptions(
-                    endpoint.Host,
-                    kvmPort,
-                    verificationKey.WireValue,
-                    Encrypted: login.KvmEncrypted,
-                    ExtendedVerifyValue: login.ExtendedVerifyValue,
-                    VirtualMediaEncrypted: login.VirtualMediaEncrypted),
-                operation.Token);
-            virtualMediaController = new VirtualMediaController(session);
-            frameConsumer = ConsumeFramesAsync(session, sessionLifetime.Token);
-            diagnosticsConsumer = ConsumeDiagnosticsAsync(session, sessionLifetime.Token);
-
-            var settingsPersisted = PersistConnectionSettings(
-                AddressTextBox.Text.Trim(),
-                userName,
-                password,
-                mode);
-            password = string.Empty;
-            PasswordInput.Clear();
-
-            SessionControlPanel.IsEnabled = true;
-            VirtualMediaButton.IsEnabled = true;
-            ConnectButton.Content = "断开连接";
-            ConnectButton.IsEnabled = true;
-            SetConnectionFormEnabled(false);
-            var connectionStatus = settingsPersisted
-                ? $"已连接 {endpoint.Host}:{kvmPort}"
-                : $"已连接 {endpoint.Host}:{kvmPort}，但本地设置未能更新";
-            SetStatus(connectionStatus, "已连接", new SolidColorBrush(Color.FromRgb(21, 155, 101)));
-            VideoHost.Focus();
-            UpdateRemoteInputStatus();
-        }
-        catch (OperationCanceledException)
-        {
-            await DisconnectAsync(updateInterface: true);
-            connectionFailed = true;
-            SetStatus("连接已取消或超时", "连接失败", InputFailedBrush);
-            UpdateRemoteInputStatus();
-        }
-        catch (Exception exception)
-        {
-            await DisconnectAsync(updateInterface: true);
-            connectionFailed = true;
-            SetStatus(exception.Message, "连接失败", InputFailedBrush);
-            UpdateRemoteInputStatus();
-            MessageBox.Show(this, exception.Message, "无法连接 iBMC", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-        finally
-        {
-            password = string.Empty;
-            operation.Dispose();
-            if (session is null)
-            {
-                PasswordInput.Clear();
-                ConnectButton.IsEnabled = true;
-                ConnectButton.Content = "连接远程控制台";
-                SetConnectionFormEnabled(true);
-            }
-        }
-    }
-
-    private async Task<(ServerCertificatePolicy Policy, string? Fingerprint)> ResolveCertificatePolicyAsync(
-        IbmcEndpoint endpoint,
-        CancellationToken cancellationToken)
-    {
-        if (TrustCheckBox.IsChecked != true)
-        {
-            return (ServerCertificatePolicy.Strict, null);
-        }
-
-        SetStatus("正在读取服务器证书", "校验证书", Brushes.Goldenrod);
-        var details = await ServerCertificateProbe.ProbeAsync(endpoint, cancellationToken);
-        var displayFingerprint = FormatFingerprint(details.Sha256Fingerprint);
-        var warning =
-            $"服务器证书不受系统信任，是否仅在本次会话中信任？\n\n" +
-            $"主题：{details.Subject}\n" +
-            $"颁发者：{details.Issuer}\n" +
-            $"有效期：{details.NotBefore:yyyy-MM-dd} 至 {details.NotAfter:yyyy-MM-dd}\n" +
-            $"验证状态：{FormatPolicyErrors(details.PolicyErrors)}\n\n" +
-            $"SHA-256：\n{displayFingerprint}\n\n" +
-            "请通过可信渠道核对该指纹。";
-        var answer = MessageBox.Show(
-            this,
-            warning,
-            "确认 iBMC 服务器证书",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning,
-            MessageBoxResult.No);
-        if (answer != MessageBoxResult.Yes)
-        {
-            throw new OperationCanceledException("用户未信任服务器证书。", cancellationToken);
-        }
-
-        return (ServerCertificatePolicy.PinForSession, details.Sha256Fingerprint);
     }
 
     private async Task ConsumeFramesAsync(KvmClientSession sourceSession, CancellationToken cancellationToken)
@@ -216,7 +87,7 @@ public partial class MainWindow : Window, IDisposable
                 {
                     blockDecoder.Reset();
                     await sourceSession.RequestFullFrameAsync(cancellationToken);
-                    await Dispatcher.InvokeAsync(() => FooterStatusText.Text = $"视频解码：{exception.Message}");
+                    await Dispatcher.InvokeAsync(() => SetStatus($"视频解码：{exception.Message}", Brushes.Goldenrod));
                     continue;
                 }
                 await Dispatcher.InvokeAsync(() => DisplayFrame(frame, pixels));
@@ -227,7 +98,7 @@ public partial class MainWindow : Window, IDisposable
                 await Dispatcher.InvokeAsync(() =>
                 {
                     connectionFailed = true;
-                    SetStatus(sourceSession.Failure.Message, "连接中断", InputFailedBrush);
+                    SetStatus(sourceSession.Failure.Message, InputFailedBrush);
                     UpdateRemoteInputStatus();
                 });
             }
@@ -257,7 +128,7 @@ public partial class MainWindow : Window, IDisposable
 
                     if (!string.IsNullOrEmpty(diagnostics.LastFrameError))
                     {
-                        FooterStatusText.Text = $"视频协议：{diagnostics.LastFrameError}";
+                        SetStatus($"视频协议：{diagnostics.LastFrameError}", Brushes.Goldenrod);
                     }
                 });
             }
@@ -295,8 +166,13 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
-    private async Task DisconnectAsync(bool updateInterface)
+    private async Task DisconnectAsync()
     {
+        if (Interlocked.Exchange(ref disconnectStarted, 1) != 0)
+        {
+            return;
+        }
+
         virtualMediaWindow?.Close();
         virtualMediaWindow = null;
         var mediaController = virtualMediaController;
@@ -326,6 +202,7 @@ public partial class MainWindow : Window, IDisposable
             catch (OperationCanceledException)
             {
             }
+
             frameConsumer = null;
         }
 
@@ -338,6 +215,7 @@ public partial class MainWindow : Window, IDisposable
             catch (OperationCanceledException)
             {
             }
+
             diagnosticsConsumer = null;
         }
 
@@ -345,24 +223,10 @@ public partial class MainWindow : Window, IDisposable
         mouseButtons = 0;
         hasLastMousePosition = false;
         Mouse.Capture(null);
-        if (!updateInterface)
-        {
-            return;
-        }
-
-        SessionControlPanel.IsEnabled = false;
-        VirtualMediaButton.IsEnabled = false;
-        ScreenshotButton.IsEnabled = false;
         latestFrame = null;
         blockDecoder = null;
-        connectionFailed = false;
-        ConnectButton.Content = "连接远程控制台";
-        ConnectButton.IsEnabled = true;
-        SetConnectionFormEnabled(true);
-        LoadSavedConnectionSettings();
         ViewerOverlay.Visibility = Visibility.Visible;
         VideoMetricsText.Text = "无视频信号";
-        SetStatus("已断开", "未连接", Brushes.Gray);
         UpdateRemoteInputStatus();
     }
 
@@ -410,8 +274,13 @@ public partial class MainWindow : Window, IDisposable
 
     private void VideoHost_MouseEnter(object sender, MouseEventArgs e)
     {
-        if (session is not null && IsActive)
+        if (session is not null)
         {
+            if (!IsActive)
+            {
+                Activate();
+            }
+
             VideoHost.Focus();
         }
 
@@ -426,6 +295,11 @@ public partial class MainWindow : Window, IDisposable
         if (session is null)
         {
             return;
+        }
+
+        if (!IsActive)
+        {
+            Activate();
         }
 
         VideoHost.Focus();
@@ -653,7 +527,7 @@ public partial class MainWindow : Window, IDisposable
         try
         {
             await activeSession.SendPowerAsync(action);
-            SetStatus("电源命令已发送", HeaderStatusText.Text, StatusDot.Fill);
+            SetStatus("电源命令已发送", InputReadyBrush);
         }
         catch (Exception exception)
         {
@@ -684,7 +558,7 @@ public partial class MainWindow : Window, IDisposable
         encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using var stream = File.Create(dialog.FileName);
         encoder.Save(stream);
-        SetStatus($"截图已保存：{Path.GetFileName(dialog.FileName)}", HeaderStatusText.Text, StatusDot.Fill);
+        SetStatus($"截图已保存：{Path.GetFileName(dialog.FileName)}", InputReadyBrush);
     }
 
     private void VirtualMediaButton_Click(object sender, RoutedEventArgs e)
@@ -728,7 +602,7 @@ public partial class MainWindow : Window, IDisposable
 
     private void Window_Activated(object? sender, EventArgs e)
     {
-        if (session is not null && VideoHost.IsMouseOver)
+        if (session is not null)
         {
             VideoHost.Focus();
         }
@@ -739,11 +613,14 @@ public partial class MainWindow : Window, IDisposable
     private void Window_Deactivated(object? sender, EventArgs e) =>
         UpdateRemoteInputStatus();
 
+    private void Window_MouseLeave(object sender, MouseEventArgs e) =>
+        ScheduleToolbarHide();
+
     private async void Window_Closed(object? sender, EventArgs e)
     {
         try
         {
-            await DisconnectAsync(updateInterface: false);
+            await DisconnectAsync();
         }
         finally
         {
@@ -753,6 +630,7 @@ public partial class MainWindow : Window, IDisposable
 
     public void Dispose()
     {
+        toolbarHideTimer.Stop();
         sessionLifetime?.Cancel();
         sessionLifetime?.Dispose();
         sessionLifetime = null;
@@ -761,15 +639,84 @@ public partial class MainWindow : Window, IDisposable
         GC.SuppressFinalize(this);
     }
 
-    private void SetConnectionFormEnabled(bool enabled)
+    private void ConsoleRoot_MouseMove(object sender, MouseEventArgs e)
     {
-        AddressTextBox.IsEnabled = enabled;
-        UserNameTextBox.IsEnabled = enabled;
-        PasswordInput.IsEnabled = enabled;
-        ModeComboBox.IsEnabled = enabled;
-        TrustCheckBox.IsEnabled = enabled;
-        RememberSettingsCheckBox.IsEnabled = enabled;
-        ClearSavedSettingsButton.IsEnabled = enabled;
+        if (e.GetPosition(ConsoleRoot).Y <= 72)
+        {
+            toolbarState.Reveal();
+            ApplyToolbarState();
+            toolbarHideTimer.Stop();
+        }
+    }
+
+    private void ToolbarRevealZone_MouseEnter(object sender, MouseEventArgs e)
+    {
+        toolbarState.Reveal();
+        ApplyToolbarState();
+        toolbarHideTimer.Stop();
+    }
+
+    private void FloatingToolbar_MouseEnter(object sender, MouseEventArgs e) =>
+        toolbarHideTimer.Stop();
+
+    private void FloatingToolbar_MouseLeave(object sender, MouseEventArgs e) =>
+        ScheduleToolbarHide();
+
+    private void PinToolbarButton_Click(object sender, RoutedEventArgs e)
+    {
+        toolbarState.SetPinned(PinToolbarButton.IsChecked == true);
+        ApplyToolbarState();
+        if (!toolbarState.IsPinned)
+        {
+            ScheduleToolbarHide();
+        }
+    }
+
+    private void ScheduleToolbarHide()
+    {
+        if (toolbarState.IsPinned)
+        {
+            return;
+        }
+
+        toolbarHideTimer.Stop();
+        toolbarHideTimer.Start();
+    }
+
+    private void ToolbarHideTimer_Tick(object? sender, EventArgs e)
+    {
+        toolbarHideTimer.Stop();
+        toolbarState.HideAfterPointerLeaves(FloatingToolbar.IsMouseOver);
+        ApplyToolbarState();
+    }
+
+    private void ApplyToolbarState()
+    {
+        FloatingToolbar.Visibility = toolbarState.IsVisible ? Visibility.Visible : Visibility.Collapsed;
+        PinToolbarButton.IsChecked = toolbarState.IsPinned;
+        PinToolbarButton.ToolTip = toolbarState.IsPinned
+            ? "取消固定，鼠标离开后自动隐藏"
+            : "固定工具栏，始终显示";
+    }
+
+    private void PowerMenuButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button button && button.ContextMenu is { } menu)
+        {
+            menu.PlacementTarget = button;
+            menu.IsOpen = true;
+        }
+    }
+
+    private async void DisconnectButton_Click(object sender, RoutedEventArgs e)
+    {
+        DisconnectButton.IsEnabled = false;
+        SetStatus("正在关闭 KVM 连接…", Brushes.Goldenrod);
+        await DisconnectAsync();
+        var loginWindow = new LoginWindow();
+        Application.Current.MainWindow = loginWindow;
+        loginWindow.Show();
+        Close();
     }
 
     private bool CanSendRemoteInput => GetRemoteInputState() == RemoteInputState.Ready;
@@ -831,86 +778,23 @@ public partial class MainWindow : Window, IDisposable
     private void MarkConnectionFailed(Exception exception, string header)
     {
         connectionFailed = true;
-        SetStatus(exception.Message, header, InputFailedBrush);
+        SetStatus($"{header}：{exception.Message}", InputFailedBrush);
         UpdateRemoteInputStatus();
     }
 
-    private void LoadSavedConnectionSettings()
+    private void SetStatus(string message, Brush accent)
     {
-        var settings = settingsStore.Load();
-        if (settings is null)
-        {
-            return;
-        }
-
-        AddressTextBox.Text = settings.Host;
-        UserNameTextBox.Text = settings.UserName;
-        PasswordInput.Password = settings.Password;
-        ModeComboBox.SelectedIndex = settings.ConnectionMode == ConnectionMode.Exclusive ? 1 : 0;
-        TrustCheckBox.IsChecked = settings.TrustSelfSignedCertificate;
-        RememberSettingsCheckBox.IsChecked = true;
+        StatusMessageText.Text = message;
+        StatusMessageBorder.BorderBrush = accent;
+        StatusMessageText.Foreground = accent == InputFailedBrush ? ColorBrush("#FFB8B0") : Brushes.White;
+        StatusMessageBorder.Visibility = Visibility.Visible;
     }
 
-    private bool PersistConnectionSettings(
-        string host,
-        string userName,
-        string password,
-        ConnectionMode connectionMode)
+    private static SolidColorBrush ColorBrush(string color)
     {
-        if (RememberSettingsCheckBox.IsChecked != true)
-        {
-            return settingsStore.Delete();
-        }
-
-        try
-        {
-            settingsStore.Save(new ConnectionSettings(
-                host,
-                userName,
-                password,
-                connectionMode,
-                TrustCheckBox.IsChecked == true,
-                RememberSettings: true));
-            return true;
-        }
-        catch (Exception exception) when (exception is CryptographicException or IOException or
-                                               UnauthorizedAccessException or NotSupportedException or ArgumentException)
-        {
-            return false;
-        }
-    }
-
-    private void RememberSettingsCheckBox_Unchecked(object sender, RoutedEventArgs e)
-    {
-        if (!settingsStore.Delete())
-        {
-            RememberSettingsCheckBox.IsChecked = true;
-            SetStatus("无法删除本地连接设置，请检查文件权限。", HeaderStatusText.Text, StatusDot.Fill);
-        }
-    }
-
-    private void ClearSavedSettingsButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (!settingsStore.Delete())
-        {
-            SetStatus("无法删除本地连接设置，请检查文件权限。", HeaderStatusText.Text, StatusDot.Fill);
-            return;
-        }
-
-        RememberSettingsCheckBox.IsChecked = false;
-        AddressTextBox.Clear();
-        UserNameTextBox.Clear();
-        PasswordInput.Clear();
-        ModeComboBox.SelectedIndex = 0;
-        TrustCheckBox.IsChecked = false;
-        SetStatus("已清除本地保存的连接设置", HeaderStatusText.Text, StatusDot.Fill);
-    }
-
-    private void SetStatus(string footer, string header, Brush dotBrush)
-    {
-        FooterStatusText.Text = footer;
-        HeaderStatusText.Text = header;
-        StatusDot.Fill = dotBrush;
+        var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
+        brush.Freeze();
+        return brush;
     }
 
     private static int GetVirtualKey(KeyEventArgs e)
@@ -926,19 +810,4 @@ public partial class MainWindow : Window, IDisposable
         return brush;
     }
 
-    private static string GetLoginError(IbmcLoginResponse response) => response.Error switch
-    {
-        LoginErrorCode.UserLocked => "iBMC 用户已锁定。",
-        LoginErrorCode.InsufficientPrivilege => "该用户没有远程控制权限。",
-        LoginErrorCode.PasswordExpired => "iBMC 密码已过期。",
-        LoginErrorCode.LoginRestricted => "iBMC 当前限制该登录方式。",
-        _ => $"iBMC 登录失败，错误码 {response.RawErrorCode}。",
-    };
-
-    private static string FormatFingerprint(string fingerprint) =>
-        string.Join(':', Enumerable.Range(0, fingerprint.Length / 2)
-            .Select(index => fingerprint.Substring(index * 2, 2)));
-
-    private static string FormatPolicyErrors(SslPolicyErrors errors) =>
-        errors == SslPolicyErrors.None ? "系统信任" : errors.ToString();
 }

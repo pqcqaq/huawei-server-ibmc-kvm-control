@@ -17,6 +17,8 @@ See `task_plan.md` and `progress.md` for the active implementation state.
 
 ## Implemented console functions
 
+- Two-window flow: a focused login window with connection loading/error states hands the session to a video-only KVM window.
+- Full-area video with an overlaid toolbar. The left pin button keeps the toolbar visible or enables delayed auto-hide; disconnect is always on the right.
 - HTTPS login with explicit per-session certificate fingerprint confirmation.
 - Shared or exclusive KVM sessions with negotiated cipher-suite selection.
 - Huawei 64×64 JPEG/RLE video blocks, differential frames, and resolution changes.
@@ -48,4 +50,4 @@ Credentials are not saved by default. When **记住此连接** is selected, a su
 
 Open **虚拟媒体** from the connected console toolbar. Optical and directory sources are always read-only. Closing the virtual-media window leaves current mounts active; disconnecting the KVM session closes VMM and deletes generated directory images.
 
-Move the pointer over the actual remote image to activate input. The lower-left indicator turns green only when the window, viewer focus, video frame, and pointer position all allow keyboard and mouse events to be sent. Moving outside the remote image releases held remote keys/buttons and changes the indicator to blue.
+Move the pointer over the actual remote image to activate input. The lower-left indicator turns green only when the window, viewer focus, video frame, and pointer position all allow keyboard and mouse events to be sent. The client explicitly activates and focuses the video surface when the pointer enters or the window becomes active. Moving outside the remote image releases held remote keys/buttons and changes the indicator to blue. The top toolbar can be pinned or left to auto-hide; move the pointer to the top edge to reveal it again.

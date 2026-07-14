@@ -20,6 +20,8 @@
 18. [x] Run Release builds, protocol/core/app tests, sensitive-file checks, and documentation updates.
 19. [x] Add opt-in current-user DPAPI storage for the last successful connection, startup restoration, and explicit clearing.
 20. [x] Correct modern iBMC keyboard encryption and mouse-mode negotiation, and add a four-color input readiness indicator.
+21. [x] Split login and KVM windows, add a loading/error handoff, and move controls into a pinnable auto-hide overlay toolbar.
+22. [x] Harden video-surface activation/focus before remote input and add executable UI state tests.
 
 Deferred compatibility extensions: recording and hardware injection tests for keyboard/mouse. Destructive virtual-media hardware operations are implemented but are not exercised while the target session is restricted to read-only verification.
 
