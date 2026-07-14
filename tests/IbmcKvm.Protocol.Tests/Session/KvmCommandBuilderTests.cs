@@ -14,6 +14,9 @@ public sealed class KvmCommandBuilderTests
         Assert.Equal(new byte[] { 0x09, 1 }, KvmCommandBuilder.Heartbeat(1));
         Assert.Equal(new byte[] { 0x1C, 35 }, KvmCommandBuilder.SetFrameRate(35));
         Assert.Equal(new byte[] { 0x24, 0, 2, 0, 0 }, KvmCommandBuilder.SetMouseMode(absolute: true));
+        Assert.Equal(new byte[] { 0x31, 0 }, KvmCommandBuilder.RequestVirtualMediaCredential());
+        Assert.Equal(new byte[] { 0x35, 0 }, KvmCommandBuilder.RequestVirtualMediaPort());
+        Assert.Equal(new byte[] { 0x31, 7 }, KvmCommandBuilder.RequestVirtualMediaCredential(7));
     }
 
     [Fact]

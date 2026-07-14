@@ -104,6 +104,10 @@ public static class KvmCommandBuilder
         return payload;
     }
 
+    public static byte[] RequestVirtualMediaCredential(byte bladeNumber = 0) => [0x31, bladeNumber];
+
+    public static byte[] RequestVirtualMediaPort(byte bladeNumber = 0) => [0x35, bladeNumber];
+
     private static byte ValidateBlade(byte bladeNumber)
     {
         if (bladeNumber == 0)

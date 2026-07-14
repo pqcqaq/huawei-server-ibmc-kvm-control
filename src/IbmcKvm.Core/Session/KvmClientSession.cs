@@ -23,7 +23,52 @@ public sealed record KvmConnectionOptions(
     byte BladeNumber = 1,
     byte ColorDepth = 3,
     bool Encrypted = false,
-    string? ExtendedVerifyValue = null);
+    string? ExtendedVerifyValue = null,
+    byte VirtualMediaBladeNumber = 0);
+
+public sealed class KvmVirtualMediaEndpoint
+{
+    public KvmVirtualMediaEndpoint(
+        string host,
+        int port,
+        ReadOnlySpan<byte> credential,
+        ReadOnlySpan<byte> salt,
+        KvmCipherSuite cipherSuite)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(host);
+        ArgumentNullException.ThrowIfNull(cipherSuite);
+        if (credential.Length != KvmVirtualMediaNegotiationParser.CredentialLength)
+        {
+            throw new ArgumentException("A VMM credential contains exactly 20 bytes.", nameof(credential));
+        }
+
+        if (salt.Length != KvmVirtualMediaNegotiationParser.SaltLength)
+        {
+            throw new ArgumentException("A VMM salt contains exactly 16 bytes.", nameof(salt));
+        }
+
+        if (port is < 1 or > ushort.MaxValue)
+        {
+            throw new ArgumentOutOfRangeException(nameof(port));
+        }
+
+        Host = host;
+        Port = port;
+        Credential = credential.ToArray();
+        Salt = salt.ToArray();
+        CipherSuite = cipherSuite;
+    }
+
+    public string Host { get; }
+
+    public int Port { get; }
+
+    public ReadOnlyMemory<byte> Credential { get; }
+
+    public ReadOnlyMemory<byte> Salt { get; }
+
+    public KvmCipherSuite CipherSuite { get; }
+}
 
 public sealed record KvmSessionDiagnostics(
     KvmSessionState State,
@@ -49,6 +94,13 @@ public sealed class KvmClientSession : IAsyncDisposable
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource firstVideoPacket =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<KvmVirtualMediaCredential> virtualMediaCredential =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<int> virtualMediaPort =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<byte> virtualMediaDenied =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly SemaphoreSlim virtualMediaQueryGate = new(1, 1);
     private long lastFullFrameRequest;
     private long packetsReceived;
     private long videoPacketsReceived;
@@ -69,6 +121,7 @@ public sealed class KvmClientSession : IAsyncDisposable
             SingleWriter = true,
             AllowSynchronousContinuations = false,
         });
+        SelectedCipherSuite = new KvmCipherSuite(1, 5000);
         State = KvmSessionState.Connecting;
         receiveLoop = RunReceiveLoopAsync();
         heartbeatLoop = RunHeartbeatLoopAsync();
@@ -77,6 +130,8 @@ public sealed class KvmClientSession : IAsyncDisposable
     public KvmSessionState State { get; private set; }
 
     public Exception? Failure { get; private set; }
+
+    public KvmCipherSuite SelectedCipherSuite { get; private set; }
 
     public KvmSessionDiagnostics GetDiagnostics() => new(
         State,
@@ -112,6 +167,7 @@ public sealed class KvmClientSession : IAsyncDisposable
                     .WaitAsync(TimeSpan.FromSeconds(5), cancellationToken)
                     .ConfigureAwait(false);
                 var selected = KvmCipherSuiteParser.SelectPreferred(offers);
+                session.SelectedCipherSuite = selected;
                 await session.SendAsync(
                     KvmCommandBuilder.SelectCipherSuite(options.BladeNumber, selected.Algorithm, selected.Iterations),
                     cancellationToken).ConfigureAwait(false);
@@ -158,6 +214,58 @@ public sealed class KvmClientSession : IAsyncDisposable
     public ValueTask RequestFullFrameAsync(CancellationToken cancellationToken = default) =>
         SendAsync(KvmCommandBuilder.RequestFullFrame(options.BladeNumber), cancellationToken);
 
+    public async Task<KvmVirtualMediaEndpoint> GetVirtualMediaEndpointAsync(
+        TimeSpan? timeout = null,
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
+        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(5);
+        if (effectiveTimeout <= TimeSpan.Zero && effectiveTimeout != Timeout.InfiniteTimeSpan)
+        {
+            throw new ArgumentOutOfRangeException(nameof(timeout));
+        }
+
+        await virtualMediaQueryGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await SendAsync(
+                KvmCommandBuilder.RequestVirtualMediaCredential(options.VirtualMediaBladeNumber),
+                cancellationToken).ConfigureAwait(false);
+            await SendAsync(
+                KvmCommandBuilder.RequestVirtualMediaPort(options.VirtualMediaBladeNumber),
+                cancellationToken).ConfigureAwait(false);
+
+            using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutSource.CancelAfter(effectiveTimeout);
+            var negotiation = Task.WhenAll(virtualMediaCredential.Task, virtualMediaPort.Task);
+            var completed = await Task.WhenAny(negotiation, virtualMediaDenied.Task)
+                .WaitAsync(timeoutSource.Token).ConfigureAwait(false);
+            if (completed == virtualMediaDenied.Task)
+            {
+                var state = await virtualMediaDenied.Task.ConfigureAwait(false);
+                throw new UnauthorizedAccessException($"The iBMC denied virtual-media access (state {state}).");
+            }
+
+            await negotiation.ConfigureAwait(false);
+            var credential = await virtualMediaCredential.Task.ConfigureAwait(false);
+            var port = await virtualMediaPort.Task.ConfigureAwait(false);
+            return new KvmVirtualMediaEndpoint(
+                options.Host,
+                port,
+                credential.Credential,
+                credential.Salt,
+                SelectedCipherSuite);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException("The iBMC did not return virtual-media negotiation data in time.");
+        }
+        finally
+        {
+            virtualMediaQueryGate.Release();
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref disposed, 1) != 0)
@@ -188,6 +296,7 @@ public sealed class KvmClientSession : IAsyncDisposable
         {
             State = KvmSessionState.Closed;
             frames.Writer.TryComplete();
+            virtualMediaQueryGate.Dispose();
             lifetime.Dispose();
         }
     }
@@ -236,6 +345,24 @@ public sealed class KvmClientSession : IAsyncDisposable
                 if (packet.Command == 0x08 && packet.Payload.Length >= 3)
                 {
                     connectionState.TrySetResult(packet.Payload.Span[2]);
+                    continue;
+                }
+
+                if (packet.Command == 0x32)
+                {
+                    ProcessVirtualMediaCredential(packet.Payload.Span);
+                    continue;
+                }
+
+                if (packet.Command == 0x36)
+                {
+                    ProcessVirtualMediaPort(packet.Payload.Span);
+                    continue;
+                }
+
+                if (packet.Command == 0x51)
+                {
+                    ProcessVirtualMediaPrivilege(packet.Payload.Span);
                     continue;
                 }
 
@@ -335,6 +462,58 @@ public sealed class KvmClientSession : IAsyncDisposable
     {
         Failure ??= exception;
         State = KvmSessionState.Faulted;
+        virtualMediaCredential.TrySetException(exception);
+        virtualMediaPort.TrySetException(exception);
         lifetime.Cancel();
+    }
+
+    private void ProcessVirtualMediaCredential(ReadOnlySpan<byte> payload)
+    {
+        try
+        {
+            var response = KvmVirtualMediaNegotiationParser.ParseCredential(payload);
+            if (response.BladeNumber == options.VirtualMediaBladeNumber)
+            {
+                virtualMediaCredential.TrySetResult(response);
+            }
+        }
+        catch (InvalidDataException exception)
+        {
+            virtualMediaCredential.TrySetException(exception);
+        }
+    }
+
+    private void ProcessVirtualMediaPort(ReadOnlySpan<byte> payload)
+    {
+        try
+        {
+            var response = KvmVirtualMediaNegotiationParser.ParsePort(payload);
+            if (response.BladeNumber == options.VirtualMediaBladeNumber)
+            {
+                virtualMediaPort.TrySetResult(response.Port);
+            }
+        }
+        catch (InvalidDataException exception)
+        {
+            virtualMediaPort.TrySetException(exception);
+        }
+    }
+
+    private void ProcessVirtualMediaPrivilege(ReadOnlySpan<byte> payload)
+    {
+        try
+        {
+            var response = KvmVirtualMediaNegotiationParser.ParsePrivilege(payload);
+            if (response.BladeNumber == options.VirtualMediaBladeNumber &&
+                KvmVirtualMediaNegotiationParser.IsDeniedPrivilege(response.State))
+            {
+                virtualMediaDenied.TrySetResult(response.State);
+            }
+        }
+        catch (InvalidDataException exception)
+        {
+            virtualMediaCredential.TrySetException(exception);
+            virtualMediaPort.TrySetException(exception);
+        }
     }
 }
