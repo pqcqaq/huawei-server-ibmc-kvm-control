@@ -1,12 +1,14 @@
 using System.Net;
 using System.Net.Security;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 
 namespace IbmcKvm.Protocol.Login;
 
 public enum ServerCertificatePolicy
 {
     Strict,
-    AllowUntrustedForSession,
+    PinForSession,
 }
 
 public sealed class IbmcLoginClient(HttpClient httpClient, TimeSpan requestTimeout)
@@ -56,8 +58,18 @@ public sealed class IbmcLoginClient(HttpClient httpClient, TimeSpan requestTimeo
         return LegacyLoginResponseParser.Parse(body);
     }
 
-    public static HttpClient CreateHttpClient(ServerCertificatePolicy certificatePolicy)
+    public static HttpClient CreateHttpClient(
+        ServerCertificatePolicy certificatePolicy,
+        string? pinnedSha256Fingerprint = null)
     {
+        var normalizedPin = pinnedSha256Fingerprint is null
+            ? null
+            : CertificateFingerprint.Normalize(pinnedSha256Fingerprint);
+        if (certificatePolicy == ServerCertificatePolicy.PinForSession && normalizedPin is null)
+        {
+            throw new ArgumentException("A SHA-256 certificate fingerprint is required for session pinning.", nameof(pinnedSha256Fingerprint));
+        }
+
         var handler = new SocketsHttpHandler
         {
             AutomaticDecompression = DecompressionMethods.All,
@@ -65,10 +77,11 @@ public sealed class IbmcLoginClient(HttpClient httpClient, TimeSpan requestTimeo
             PooledConnectionLifetime = TimeSpan.FromMinutes(2),
         };
 
-        if (certificatePolicy == ServerCertificatePolicy.AllowUntrustedForSession)
+        if (certificatePolicy == ServerCertificatePolicy.PinForSession)
         {
-            handler.SslOptions.RemoteCertificateValidationCallback = static (_, _, _, errors) =>
-                errors == SslPolicyErrors.None || errors != SslPolicyErrors.None;
+            handler.SslOptions.RemoteCertificateValidationCallback = (_, certificate, _, errors) =>
+                errors == SslPolicyErrors.None ||
+                certificate is not null && CertificateFingerprint.Matches(certificate, normalizedPin!);
         }
 
         return new HttpClient(handler, disposeHandler: true)
@@ -110,4 +123,3 @@ public sealed class IbmcLoginClient(HttpClient httpClient, TimeSpan requestTimeo
         return await reader.ReadAsync(trailing.AsMemory(), cancellationToken).ConfigureAwait(false) != 0;
     }
 }
-

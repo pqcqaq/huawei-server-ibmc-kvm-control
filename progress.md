@@ -4,7 +4,7 @@ Last updated: 2026-07-14
 
 ## In progress
 
-- [ ] Phase 4: Video packet reconstruction and WPF frame rendering
+- [ ] Optional compatibility extensions: recording and virtual media
 
 ## Completed
 
@@ -18,22 +18,29 @@ Last updated: 2026-07-14
 - [x] HTTPS login request/response parsing with redacted diagnostics
 - [x] CRC-16-H, legacy packet encoding, and incremental stream framing
 - [x] Bounded asynchronous TCP connection with cancellation and loopback integration tests
+- [x] Cipher-suite negotiation (`0x42`/`0x43`/`0x44`) and KVM session handshake
+- [x] Certificate SHA-256 fingerprint probe and per-session pinning
+- [x] Keyboard HID reports, absolute mouse packets, heartbeat, and confirmed power packets
+- [x] WPF operational console with shared/exclusive sessions, screenshot, and full-screen controls
+- [x] Video chunk assembly with firmware unchanged-frame marker handling
+- [x] 64×64 JPEG/RLE block decoder with prior/above/left block reuse
+- [x] All ten synthetic JPEG headers match the original JAR byte-for-byte
+- [x] Hardware video verified at 720×400 with quantization-table index 6 and correct color/block layout
 
 ## Pending
 
-- [x] HTTPS login and session negotiation
-- [x] KVM packet framing and asynchronous transport
-- [ ] KVM authentication packet exchange
-- [ ] Video decode and frame rendering
-- [ ] Window-local keyboard and mouse input
-- [ ] Reconnect, diagnostics, and cancellation
-- [ ] Power controls, screenshots, recording, and virtual media
-- [ ] Hardware-in-the-loop validation against the target iBMC
+- [ ] Hardware keyboard/mouse injection validation (not run under the read-only constraint)
+- [ ] Recording and virtual-media compatibility extensions
 
 ## Verification log
 
 - Reverse artifact payload SHA-256: `238775201099AFFAF606DE26261A0057FD1E8613B2D0DC14CA9C687A969FEC1C`
 - Toolchain: .NET SDK 9.0.304; Windows WPF template available
 - `dotnet build IbmcKvm.slnx --configuration Release --no-restore`: passed, 0 warnings, 0 errors
-- `dotnet test IbmcKvm.slnx --configuration Release --no-build`: passed, 2 tests
-- `dotnet test tests/IbmcKvm.Protocol.Tests/IbmcKvm.Protocol.Tests.csproj --configuration Release`: passed, 42 tests
+- `dotnet build IbmcKvm.slnx --configuration Release --no-restore`: passed, 0 warnings, 0 errors
+- `dotnet test IbmcKvm.slnx --configuration Release --no-build`: passed, 100 tests
+  - Protocol: 54
+  - Core: 32
+  - App/video: 14
+- Legacy JPEG header oracle: all 10 table indexes match at 698 bytes each
+- Read-only hardware capture: 720×400, table index 6, 0 assembled-frame errors; visual inspection passed

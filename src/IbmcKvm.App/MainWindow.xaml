@@ -5,8 +5,155 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:IbmcKvm.App"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="iBMC Remote Console"
+        Width="1280" Height="800" MinWidth="980" MinHeight="640"
+        Background="{StaticResource CanvasBrush}"
+        WindowStartupLocation="CenterScreen"
+        Closed="Window_Closed">
     <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="48" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="28" />
+        </Grid.RowDefinitions>
 
+        <Border Grid.Row="0" Background="#18211E" BorderBrush="#33403B" BorderThickness="0,0,0,1">
+            <DockPanel Margin="16,0,12,0" LastChildFill="True">
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Width="24" Height="24" Background="#159B65" CornerRadius="2" Margin="0,0,10,0">
+                        <TextBlock Text="K" Foreground="White" FontFamily="Bahnschrift" FontWeight="Bold"
+                                   FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock Text="iBMC KVM" Foreground="#F2F5F3" FontFamily="Bahnschrift SemiBold"
+                               FontSize="17" VerticalAlignment="Center" />
+                    <Border Width="1" Height="18" Background="#52605A" Margin="14,0" />
+                    <Ellipse x:Name="StatusDot" Width="8" Height="8" Fill="#77827D" Margin="0,0,7,0" />
+                    <TextBlock x:Name="HeaderStatusText" Text="未连接" Foreground="#BEC8C3"
+                               FontSize="12" VerticalAlignment="Center" />
+                </StackPanel>
+
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="ScreenshotButton" Style="{StaticResource ToolButton}" IsEnabled="False"
+                            Click="ScreenshotButton_Click" ToolTip="保存当前画面">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE722;" FontFamily="Segoe Fluent Icons" Foreground="White" Margin="0,0,7,0" />
+                            <TextBlock Text="截图" Foreground="White" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="FullscreenButton" Style="{StaticResource ToolButton}"
+                            Click="FullscreenButton_Click" ToolTip="切换全屏">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE740;" FontFamily="Segoe Fluent Icons" Foreground="White" Margin="0,0,7,0" />
+                            <TextBlock Text="全屏" Foreground="White" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="292" />
+                <ColumnDefinition Width="1" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Background="#ECEBE6">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="20,18,20,24">
+                        <TextBlock Text="连接" FontFamily="Bahnschrift SemiBold" FontSize="15" Margin="0,0,0,14" />
+
+                        <TextBlock Text="iBMC 地址" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,0,0,5" />
+                        <TextBox x:Name="AddressTextBox" Text="" ToolTip="主机名、IP 或 https://地址:端口" />
+
+                        <TextBlock Text="用户名" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,12,0,5" />
+                        <TextBox x:Name="UserNameTextBox" />
+
+                        <TextBlock Text="密码" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,12,0,5" />
+                        <PasswordBox x:Name="PasswordInput" />
+
+                        <TextBlock Text="会话模式" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,12,0,5" />
+                        <ComboBox x:Name="ModeComboBox" SelectedIndex="0">
+                            <ComboBoxItem Content="共享控制" Tag="Shared" />
+                            <ComboBoxItem Content="独占控制" Tag="Exclusive" />
+                        </ComboBox>
+
+                        <CheckBox x:Name="TrustCheckBox" Margin="0,14,0,0" VerticalContentAlignment="Center"
+                                  Content="本次会话信任自签名证书" FontSize="12" />
+                        <TextBlock Text="启用后会先显示服务器证书 SHA-256 指纹，确认后才发送凭据。"
+                                   Foreground="{StaticResource MutedBrush}" FontSize="10" TextWrapping="Wrap"
+                                   Margin="22,4,0,0" />
+
+                        <Button x:Name="ConnectButton" Content="连接远程控制台" Style="{StaticResource PrimaryButton}"
+                                Margin="0,18,0,0" Click="ConnectButton_Click" />
+
+                        <Border Height="1" Background="{StaticResource LineBrush}" Margin="0,22,0,18" />
+
+                        <StackPanel x:Name="SessionControlPanel" IsEnabled="False">
+                            <TextBlock Text="会话控制" FontFamily="Bahnschrift SemiBold" FontSize="15" Margin="0,0,0,12" />
+                            <UniformGrid Columns="2" Rows="2">
+                                <Button Content="开机" Style="{StaticResource BaseButton}" Margin="0,0,5,5"
+                                        Click="PowerOnButton_Click" ToolTip="发送开机命令" />
+                                <Button Content="正常关机" Style="{StaticResource BaseButton}" Margin="5,0,0,5"
+                                        Click="GracefulPowerOffButton_Click" ToolTip="请求操作系统正常关机" />
+                                <Button Content="重启" Style="{StaticResource BaseButton}" Margin="0,5,5,0"
+                                        Click="RestartButton_Click" ToolTip="立即重启服务器" />
+                                <Button Content="强制关机" Style="{StaticResource BaseButton}" Margin="5,5,0,0"
+                                        Click="PowerOffButton_Click" ToolTip="立即切断电源" />
+                            </UniformGrid>
+
+                            <TextBlock Text="键盘" FontFamily="Bahnschrift SemiBold" FontSize="13" Margin="0,20,0,9" />
+                            <Button Content="发送 Ctrl + Alt + Delete" Style="{StaticResource BaseButton}"
+                                    Click="CtrlAltDeleteButton_Click" />
+                            <Button Content="释放全部按键" Style="{StaticResource BaseButton}" Margin="0,8,0,0"
+                                    Click="ReleaseKeysButton_Click" />
+
+                            <Border Background="#DFE8E2" BorderBrush="#B9CEC0" BorderThickness="1"
+                                    Padding="10" Margin="0,18,0,0">
+                                <TextBlock Text="输入仅在黑色视频区获得焦点时发送，不安装系统级键盘钩子。"
+                                           Foreground="#345144" FontSize="10" TextWrapping="Wrap" />
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <Border Grid.Column="1" Background="{StaticResource LineBrush}" />
+
+            <Grid x:Name="VideoHost" Grid.Column="2" Background="#090B0A" Focusable="True"
+                  PreviewKeyDown="VideoHost_PreviewKeyDown" PreviewKeyUp="VideoHost_PreviewKeyUp"
+                  LostKeyboardFocus="VideoHost_LostKeyboardFocus"
+                  PreviewMouseDown="VideoHost_PreviewMouseDown" PreviewMouseUp="VideoHost_PreviewMouseUp"
+                  PreviewMouseMove="VideoHost_PreviewMouseMove" PreviewMouseWheel="VideoHost_PreviewMouseWheel">
+                <Image x:Name="RemoteImage" Stretch="Uniform" SnapsToDevicePixels="True"
+                       RenderOptions.BitmapScalingMode="HighQuality" />
+
+                <Border x:Name="ViewerOverlay" Background="#B8090B0A">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="&#xE968;" FontFamily="Segoe Fluent Icons" FontSize="36"
+                                   Foreground="#718079" HorizontalAlignment="Center" />
+                        <TextBlock Text="等待连接" FontFamily="Bahnschrift SemiBold" FontSize="18"
+                                   Foreground="#DCE4E0" HorizontalAlignment="Center" Margin="0,14,0,0" />
+                        <TextBlock Text="输入地址和凭据后连接 iBMC 远程控制台"
+                                   Foreground="#7F8D86" FontSize="11" Margin="0,6,0,0" />
+                    </StackPanel>
+                </Border>
+
+                <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12"
+                        Background="#C51A211E" BorderBrush="#46534E" BorderThickness="1"
+                        Padding="8,4" IsHitTestVisible="False">
+                    <TextBlock x:Name="VideoMetricsText" Text="无视频信号" Foreground="#DDE5E1" FontSize="10" />
+                </Border>
+            </Grid>
+        </Grid>
+
+        <Border Grid.Row="2" Background="#DADCD7" BorderBrush="#C1C5C0" BorderThickness="0,1,0,0">
+            <DockPanel Margin="10,0">
+                <TextBlock x:Name="FooterStatusText" Text="就绪" VerticalAlignment="Center"
+                           Foreground="#44504B" FontSize="10" />
+                <TextBlock DockPanel.Dock="Right" Text="x64 · .NET 9 · 窗口内输入" VerticalAlignment="Center"
+                           Foreground="#68736E" FontSize="10" />
+            </DockPanel>
+        </Border>
     </Grid>
 </Window>
