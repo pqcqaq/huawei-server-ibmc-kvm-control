@@ -24,7 +24,8 @@ public sealed record KvmConnectionOptions(
     byte ColorDepth = 3,
     bool Encrypted = false,
     string? ExtendedVerifyValue = null,
-    byte VirtualMediaBladeNumber = 0);
+    byte VirtualMediaBladeNumber = 0,
+    bool VirtualMediaEncrypted = true);
 
 public sealed class KvmVirtualMediaEndpoint
 {
@@ -33,7 +34,8 @@ public sealed class KvmVirtualMediaEndpoint
         int port,
         ReadOnlySpan<byte> credential,
         ReadOnlySpan<byte> salt,
-        KvmCipherSuite cipherSuite)
+        KvmCipherSuite cipherSuite,
+        bool encrypted = true)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host);
         ArgumentNullException.ThrowIfNull(cipherSuite);
@@ -57,6 +59,7 @@ public sealed class KvmVirtualMediaEndpoint
         Credential = credential.ToArray();
         Salt = salt.ToArray();
         CipherSuite = cipherSuite;
+        Encrypted = encrypted;
     }
 
     public string Host { get; }
@@ -68,6 +71,8 @@ public sealed class KvmVirtualMediaEndpoint
     public ReadOnlyMemory<byte> Salt { get; }
 
     public KvmCipherSuite CipherSuite { get; }
+
+    public bool Encrypted { get; }
 }
 
 public sealed record KvmSessionDiagnostics(
@@ -254,7 +259,8 @@ public sealed class KvmClientSession : IAsyncDisposable
                 port,
                 credential.Credential,
                 credential.Salt,
-                SelectedCipherSuite);
+                SelectedCipherSuite,
+                options.VirtualMediaEncrypted);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {

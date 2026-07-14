@@ -49,7 +49,7 @@ After authentication, the BMC requests device type 1 (floppy/UFI) or 2 (optical/
 
 ## Media Backends
 
-`IRandomAccessMedia` exposes capacity, block size, write protection, random reads, optional writes, change/eject state, and inquiry data. Image files use asynchronous `FileStream` random access. Physical drives use raw Windows handles and storage IOCTLs. Directory sources are first built into a temporary Joliet ISO so they share the optical image behavior and can be deleted reliably on disconnect.
+`IRandomAccessMedia` exposes capacity, block size, write protection, random reads, optional writes, and flush. Session/controller state owns change and eject lifecycle. Image files use asynchronous random access handles. Physical drives use raw Windows handles and storage IOCTLs. Directory sources are first built into a temporary Joliet ISO so they share the optical image behavior and can be deleted reliably on disconnect.
 
 ## Failure Modes
 

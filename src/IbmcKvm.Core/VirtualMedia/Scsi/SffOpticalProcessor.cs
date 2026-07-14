@@ -47,7 +47,6 @@ public sealed class SffOpticalProcessor(IRandomAccessMedia media) : ScsiCommandP
             case 0x2B:
                 return Succeed();
             case 0x25:
-            case 0x37:
                 return ReadCapacity();
             case 0x43:
                 return ReadToc(bytes);
@@ -145,6 +144,11 @@ public sealed class SffOpticalProcessor(IRandomAccessMedia media) : ScsiCommandP
         switch (format)
         {
             case 0:
+                if (startTrack > 1 && startTrack != 0xAA)
+                {
+                    return Fail(5, 0x24, 0);
+                }
+
                 if (startTrack <= 1)
                 {
                     result.AddRange([0, 0x14, 1, 0, 0, 0, isMsf ? (byte)2 : (byte)0, 0]);
@@ -163,7 +167,7 @@ public sealed class SffOpticalProcessor(IRandomAccessMedia media) : ScsiCommandP
                     result.Add(0x14);
                     result.Add(0);
                     result.Add(index < 3 ? (byte)(0xA0 + index) : (byte)1);
-                    result.AddRange([0, 0, 0, 0]);
+                    result.AddRange([0, 0, 0]);
                     if (index < 2)
                     {
                         result.AddRange([0, 1, 0, 0]);

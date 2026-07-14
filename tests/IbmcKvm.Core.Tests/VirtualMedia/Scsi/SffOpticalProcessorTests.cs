@@ -79,6 +79,7 @@ public sealed class SffOpticalProcessorTests
     [InlineData(0xB9)]
     [InlineData(0xBE)]
     [InlineData(0x4E)]
+    [InlineData(0x37)]
     [InlineData(0xFF)]
     public async Task ReturnsInvalidFieldForUnsupportedOriginalOpticalCommands(byte opcode)
     {

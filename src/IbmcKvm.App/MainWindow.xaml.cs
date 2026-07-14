@@ -8,6 +8,7 @@ using System.Windows.Media.Imaging;
 using IbmcKvm.Core.Input;
 using IbmcKvm.Core.Session;
 using IbmcKvm.Core.Video;
+using IbmcKvm.Core.VirtualMedia;
 using IbmcKvm.Protocol.Login;
 using IbmcKvm.Protocol.Session;
 using Microsoft.Win32;
@@ -19,6 +20,8 @@ public partial class MainWindow : Window, IDisposable
     private readonly HidKeyboardState keyboard = new();
     private readonly Stopwatch frameClock = Stopwatch.StartNew();
     private KvmClientSession? session;
+    private VirtualMediaController? virtualMediaController;
+    private VirtualMediaWindow? virtualMediaWindow;
     private CancellationTokenSource? sessionLifetime;
     private Task? frameConsumer;
     private Task? diagnosticsConsumer;
@@ -79,7 +82,7 @@ public partial class MainWindow : Window, IDisposable
 
             var verificationKey = SessionVerificationKey.Parse(
                 login.VerifyValue ?? throw new FormatException("登录响应缺少 KVM 校验值。"));
-            var kvmPort = login.KvmPort ?? throw new FormatException("登录响应缺少 KVM 端口。" );
+            var kvmPort = login.KvmPort ?? throw new FormatException("登录响应缺少 KVM 端口。");
 
             sessionLifetime = new CancellationTokenSource();
             session = await KvmClientSession.ConnectAsync(
@@ -88,12 +91,15 @@ public partial class MainWindow : Window, IDisposable
                     kvmPort,
                     verificationKey.WireValue,
                     Encrypted: login.KvmEncrypted,
-                    ExtendedVerifyValue: login.ExtendedVerifyValue),
+                    ExtendedVerifyValue: login.ExtendedVerifyValue,
+                    VirtualMediaEncrypted: login.VirtualMediaEncrypted),
                 operation.Token);
+            virtualMediaController = new VirtualMediaController(session);
             frameConsumer = ConsumeFramesAsync(session, sessionLifetime.Token);
             diagnosticsConsumer = ConsumeDiagnosticsAsync(session, sessionLifetime.Token);
 
             SessionControlPanel.IsEnabled = true;
+            VirtualMediaButton.IsEnabled = true;
             ConnectButton.Content = "断开连接";
             ConnectButton.IsEnabled = true;
             SetConnectionFormEnabled(false);
@@ -251,6 +257,15 @@ public partial class MainWindow : Window, IDisposable
 
     private async Task DisconnectAsync(bool updateInterface)
     {
+        virtualMediaWindow?.Close();
+        virtualMediaWindow = null;
+        var mediaController = virtualMediaController;
+        virtualMediaController = null;
+        if (mediaController is not null)
+        {
+            await mediaController.DisposeAsync();
+        }
+
         var activeSession = session;
         session = null;
         sessionLifetime?.Cancel();
@@ -294,6 +309,7 @@ public partial class MainWindow : Window, IDisposable
         }
 
         SessionControlPanel.IsEnabled = false;
+        VirtualMediaButton.IsEnabled = false;
         ScreenshotButton.IsEnabled = false;
         ConnectButton.Content = "连接远程控制台";
         ConnectButton.IsEnabled = true;
@@ -551,6 +567,24 @@ public partial class MainWindow : Window, IDisposable
         SetStatus($"截图已保存：{Path.GetFileName(dialog.FileName)}", HeaderStatusText.Text, StatusDot.Fill);
     }
 
+    private void VirtualMediaButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (virtualMediaController is null)
+        {
+            return;
+        }
+
+        if (virtualMediaWindow is { IsLoaded: true })
+        {
+            virtualMediaWindow.Activate();
+            return;
+        }
+
+        virtualMediaWindow = new VirtualMediaWindow(virtualMediaController) { Owner = this };
+        virtualMediaWindow.Closed += (_, _) => virtualMediaWindow = null;
+        virtualMediaWindow.Show();
+    }
+
     private void FullscreenButton_Click(object sender, RoutedEventArgs e)
     {
         if (!fullScreen)
@@ -589,6 +623,8 @@ public partial class MainWindow : Window, IDisposable
         sessionLifetime?.Cancel();
         sessionLifetime?.Dispose();
         sessionLifetime = null;
+        virtualMediaWindow?.Close();
+        virtualMediaWindow = null;
         GC.SuppressFinalize(this);
     }
 

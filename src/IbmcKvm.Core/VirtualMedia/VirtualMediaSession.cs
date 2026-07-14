@@ -21,6 +21,7 @@ public sealed class VirtualMediaSession : IAsyncDisposable
     private readonly NetworkStream stream;
     private readonly VmmPacketCodec codec = new();
     private readonly VmmDerivedCredential credential;
+    private readonly bool encrypted;
     private readonly CancellationTokenSource lifetime = new();
     private readonly Channel<VmmPacket> outbound;
     private readonly Channel<byte> acknowledgements;
@@ -36,10 +37,11 @@ public sealed class VirtualMediaSession : IAsyncDisposable
     private long lastReceiveTick = Environment.TickCount64;
     private int disposed;
 
-    private VirtualMediaSession(TcpClient client, VmmDerivedCredential credential)
+    private VirtualMediaSession(TcpClient client, VmmDerivedCredential credential, bool encrypted)
     {
         this.client = client;
         this.credential = credential;
+        this.encrypted = encrypted;
         stream = client.GetStream();
         outbound = Channel.CreateBounded<VmmPacket>(new BoundedChannelOptions(64)
         {
@@ -98,7 +100,7 @@ public sealed class VirtualMediaSession : IAsyncDisposable
                 endpoint.Credential.Span,
                 endpoint.Salt.Span,
                 endpoint.CipherSuite);
-            session = new VirtualMediaSession(client, derived);
+            session = new VirtualMediaSession(client, derived, endpoint.Encrypted);
             var localAddress = ((IPEndPoint)client.Client.LocalEndPoint!).Address.GetAddressBytes();
             await session.SendAsync(VmmPacket.Authenticate(derived.SessionId, localAddress), cancellationToken)
                 .ConfigureAwait(false);
@@ -391,7 +393,9 @@ public sealed class VirtualMediaSession : IAsyncDisposable
             return;
         }
 
-        var data = VmmCredentialDeriver.UnwrapEncryptedPayload(packet.Payload, credential);
+        var data = encrypted
+            ? VmmCredentialDeriver.UnwrapEncryptedPayload(packet.Payload, credential)
+            : packet.Payload;
         if (pending.Data.Length + data.Length > pending.ExpectedLength)
         {
             pending.Data.Dispose();
@@ -451,11 +455,11 @@ public sealed class VirtualMediaSession : IAsyncDisposable
             var state = offset + count == response.Data.Length
                 ? VmmTransferState.End
                 : VmmTransferState.Continue;
-            var encrypted = VmmCredentialDeriver.WrapEncryptedPayload(
-                response.Data.AsSpan(offset, count),
-                credential);
+            var payload = encrypted
+                ? VmmCredentialDeriver.WrapEncryptedPayload(response.Data.AsSpan(offset, count), credential)
+                : response.Data.AsSpan(offset, count).ToArray();
             await SendAsync(
-                VmmPacket.Data(ToVmmDevice(kind), VmmTransferKind.Data, state, commandId, encrypted),
+                VmmPacket.Data(ToVmmDevice(kind), VmmTransferKind.Data, state, commandId, payload),
                 lifetime.Token).ConfigureAwait(false);
             offset += count;
         }

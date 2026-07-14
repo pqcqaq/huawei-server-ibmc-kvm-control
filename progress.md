@@ -4,7 +4,7 @@ Last updated: 2026-07-14
 
 ## In progress
 
-- [ ] Optional compatibility extensions: recording and virtual media
+- [ ] Optional recording extension
 
 ## Completed
 
@@ -26,11 +26,19 @@ Last updated: 2026-07-14
 - [x] 64×64 JPEG/RLE block decoder with prior/above/left block reuse
 - [x] All ten synthetic JPEG headers match the original JAR byte-for-byte
 - [x] Hardware video verified at 720×400 with quantization-table index 6 and correct color/block layout
+- [x] VMM `0x31`/`0x35` negotiation with bounded credential, salt, port, and privilege parsing
+- [x] VMM 12-byte framing and Java-oracle PBKDF2/AES compatibility vectors
+- [x] File image, raw physical drive, directory-to-Joliet ISO, and physical-media image creation backends
+- [x] UFI floppy and SFF-8020i optical processors with original inquiry/capacity/TOC/sense behavior
+- [x] Independent VMM TCP session with authentication, heartbeat, simultaneous devices, reconnect, and cleanup
+- [x] WPF virtual-media window with image/physical/directory sources, change/eject, progress, and confirmed USB reset
+- [x] Read-only target VMM capability query: valid 20-byte credential, 16-byte salt, suite 3, positive iterations, plain data mode
 
 ## Pending
 
 - [ ] Hardware keyboard/mouse injection validation (not run under the read-only constraint)
-- [ ] Recording and virtual-media compatibility extensions
+- [ ] Optional recording extension
+- [ ] Destructive target validation of mount/eject/USB reset (intentionally not run under the read-only constraint)
 
 ## Verification log
 
@@ -38,9 +46,10 @@ Last updated: 2026-07-14
 - Toolchain: .NET SDK 9.0.304; Windows WPF template available
 - `dotnet build IbmcKvm.slnx --configuration Release --no-restore`: passed, 0 warnings, 0 errors
 - `dotnet build IbmcKvm.slnx --configuration Release --no-restore`: passed, 0 warnings, 0 errors
-- `dotnet test IbmcKvm.slnx --configuration Release --no-build`: passed, 100 tests
-  - Protocol: 54
-  - Core: 32
-  - App/video: 14
+- `dotnet test IbmcKvm.slnx --configuration Release --no-build`: passed, 155 tests
+  - Protocol: 77
+  - Core: 58
+  - App/video/UI: 20
 - Legacy JPEG header oracle: all 10 table indexes match at 698 bytes each
 - Read-only hardware capture: 720×400, table index 6, 0 assembled-frame errors; visual inspection passed
+- Read-only VMM query: capability available; credential/salt lengths valid; suite 3; data encryption disabled by login flag

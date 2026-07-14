@@ -12,8 +12,10 @@ namespace IbmcKvm.Core.Tests.VirtualMedia;
 
 public sealed class VirtualMediaSessionTests
 {
-    [Fact]
-    public async Task AuthenticatesCreatesTwoDevicesDispatchesInquiryAndWrites()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AuthenticatesCreatesTwoDevicesDispatchesInquiryAndWrites(bool encrypted)
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
@@ -25,8 +27,9 @@ public sealed class VirtualMediaSessionTests
             ((IPEndPoint)listener.LocalEndpoint).Port,
             credential,
             salt,
-            new KvmCipherSuite(1, 5000));
-        var server = RunServerAsync(listener, credential, salt, cancellation.Token);
+            new KvmCipherSuite(1, 5000),
+            encrypted);
+        var server = RunServerAsync(listener, credential, salt, encrypted, cancellation.Token);
         var imagePath = Path.Combine(Path.GetTempPath(), $"ibmc-vmm-{Guid.NewGuid():N}.img");
         await File.WriteAllBytesAsync(imagePath, new byte[4096], cancellation.Token);
 
@@ -115,7 +118,12 @@ public sealed class VirtualMediaSessionTests
             await close.WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private static ServerTask RunServerAsync(TcpListener listener, byte[] credential, byte[] salt, CancellationToken cancellationToken)
+    private static ServerTask RunServerAsync(
+        TcpListener listener,
+        byte[] credential,
+        byte[] salt,
+        bool encrypted,
+        CancellationToken cancellationToken)
     {
         // The handshake must happen before the background command script is exposed.
         var operationsSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -140,7 +148,10 @@ public sealed class VirtualMediaSessionTests
                 await SendAsync(stream, codec, inquiry, cancellationToken);
                 var inquiryData = await codec.ReadAsync(stream, cancellationToken);
                 Assert.Equal(VmmPacketType.FloppyData, inquiryData.Type);
-                Assert.Equal((byte)'V', VmmCredentialDeriver.UnwrapEncryptedPayload(inquiryData.Payload, derived)[8]);
+                var inquiryPayload = encrypted
+                    ? VmmCredentialDeriver.UnwrapEncryptedPayload(inquiryData.Payload, derived)
+                    : inquiryData.Payload;
+                Assert.Equal((byte)'V', inquiryPayload[8]);
                 Assert.Equal(VmmPacketType.FloppyCommandComplete, (await codec.ReadAsync(stream, cancellationToken)).Type);
                 await SendAsync(stream, codec, VmmPacket.Data(VmmDeviceType.Floppy, VmmTransferKind.Command, VmmTransferState.End, 8, Command(0x00)), cancellationToken);
                 Assert.Equal(1, (await codec.ReadAsync(stream, cancellationToken)).Field1);
@@ -148,7 +159,10 @@ public sealed class VirtualMediaSessionTests
                 Assert.Equal(0, (await codec.ReadAsync(stream, cancellationToken)).Field1);
                 await SendAsync(stream, codec, VmmPacket.Data(VmmDeviceType.Floppy, VmmTransferKind.Command, VmmTransferState.End, 10, BlockCommand(0x2A, 1, 1)), cancellationToken);
                 var writeData = Enumerable.Repeat((byte)0x5A, 512).ToArray();
-                await SendAsync(stream, codec, VmmPacket.Data(VmmDeviceType.Floppy, VmmTransferKind.Data, VmmTransferState.End, 10, VmmCredentialDeriver.WrapEncryptedPayload(writeData, derived)), cancellationToken);
+                var writePayload = encrypted
+                    ? VmmCredentialDeriver.WrapEncryptedPayload(writeData, derived)
+                    : writeData;
+                await SendAsync(stream, codec, VmmPacket.Data(VmmDeviceType.Floppy, VmmTransferKind.Data, VmmTransferState.End, 10, writePayload), cancellationToken);
                 var complete = await codec.ReadAsync(stream, cancellationToken);
                 Assert.Equal(0, complete.Field1);
                 operationsSource.TrySetResult();
