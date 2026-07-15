@@ -25,12 +25,14 @@ public sealed class KvmSessionSupervisor(KvmReconnectPolicy? policy = null)
         policy.Validate();
         var stopwatch = Stopwatch.StartNew();
         Exception? lastError = null;
+        var attemptCount = 0;
         var delay = policy.EffectiveInitialDelay;
         var tokenCopy = reconnectToken.ToArray();
         try
         {
             for (var attempt = 1; attempt <= policy.MaximumAttempts; attempt++)
             {
+                attemptCount = attempt;
                 cancellationToken.ThrowIfCancellationRequested();
                 if (stopwatch.Elapsed >= policy.EffectiveMaximumElapsed)
                 {
@@ -88,9 +90,7 @@ public sealed class KvmSessionSupervisor(KvmReconnectPolicy? policy = null)
             CryptographicOperations.ZeroMemory(tokenCopy);
         }
 
-        throw new KvmReconnectException(
-            $"The KVM reconnect policy exhausted {policy.MaximumAttempts} attempts.",
-            lastError);
+        throw new KvmReconnectException(attemptCount, policy.MaximumAttempts, lastError);
     }
 
     private void Publish(KvmReconnectProgress progress) => ProgressChanged?.Invoke(this, progress);

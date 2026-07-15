@@ -234,6 +234,7 @@
   "截图已保存：{0}": "Capture enregistrée : {0}",
   "刀片 {0} 连接中断，正在尝试恢复：{1}": "Connexion de la lame {0} interrompue ; tentative de récupération : {1}",
   "KVM 自动恢复失败：{0}": "Échec de la récupération automatique KVM : {0}",
+  "KVM 自动恢复失败：已尝试 {0} 次，请检查网络和服务器状态。": "Échec de la récupération automatique KVM après {0} tentatives. Vérifiez le réseau et l’état du serveur.",
   "KVM 连接已自动恢复": "Connexion KVM récupérée automatiquement",
   "KVM 已恢复，但虚拟介质恢复失败：{0}": "KVM récupéré, mais échec de la récupération du média virtuel : {0}",
   "正在恢复 KVM（{0}/{1}）": "Récupération KVM ({0}/{1})",

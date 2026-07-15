@@ -31,5 +31,15 @@ public sealed record KvmReconnectProgress(
     string State,
     Exception? Error = null);
 
-public sealed class KvmReconnectException(string message, Exception? innerException = null)
-    : IOException(message, innerException);
+public sealed class KvmReconnectException(
+    int attemptCount,
+    int maximumAttempts,
+    Exception? innerException = null)
+    : IOException(
+        $"The KVM reconnect policy stopped after {attemptCount} of {maximumAttempts} attempts.",
+        innerException)
+{
+    public int AttemptCount { get; } = attemptCount;
+
+    public int MaximumAttempts { get; } = maximumAttempts;
+}

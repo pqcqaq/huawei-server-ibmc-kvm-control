@@ -71,6 +71,7 @@ public partial class MainWindow : Window, IDisposable
     private RemoteKeyboardLayout keyboardLayout = RemoteKeyboardLayout.UnitedStates;
     private bool connectionFailed;
     private int disconnectStarted;
+    private int disposeStarted;
     private int toolbarAnimationVersion;
     private int reconnectStarted;
     private RemoteInputState remoteInputState = RemoteInputState.Disconnected;
@@ -205,6 +206,10 @@ public partial class MainWindow : Window, IDisposable
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested && sourceSession.Failure is not null)
+        {
+            await HandleSessionFailureAsync(runtime, sourceSession, sourceSession.Failure);
         }
     }
 
@@ -385,7 +390,9 @@ public partial class MainWindow : Window, IDisposable
                 }
             });
         }
-        catch (Exception exception) when (silent && exception is TimeoutException or InvalidDataException or NotSupportedException)
+        catch (Exception exception) when (silent &&
+                                          exception is TimeoutException or InvalidDataException or
+                                              NotSupportedException or IOException)
         {
             // A standalone BMC can use the same KVM profile without implementing chassis commands.
         }
@@ -653,13 +660,13 @@ public partial class MainWindow : Window, IDisposable
 
         virtualMediaWindow?.Close();
         virtualMediaWindow = null;
-        reconnectLifetime?.Cancel();
+        CancelReconnect();
         await StopRecordingAsync();
         virtualMediaController = null;
         var runtimes = bladeRuntimes.Values.ToArray();
         foreach (var runtime in runtimes)
         {
-            runtime.Lifetime.Cancel();
+            CancelSafely(runtime.Lifetime);
             DetachSessionEvents(runtime.Session);
         }
 
@@ -1286,12 +1293,17 @@ public partial class MainWindow : Window, IDisposable
 
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref disposeStarted, 1) != 0)
+        {
+            return;
+        }
+
         toolbarHideTimer.Stop();
         sessionSupervisor.ProgressChanged -= SessionSupervisor_ProgressChanged;
-        reconnectLifetime?.Cancel();
+        CancelReconnect();
         foreach (var runtime in bladeRuntimes.Values)
         {
-            runtime.Lifetime.Cancel();
+            CancelSafely(runtime.Lifetime);
         }
         sessionLifetime = null;
         virtualMediaWindow?.Close();
@@ -1311,7 +1323,7 @@ public partial class MainWindow : Window, IDisposable
         }
 
         var reconnectCancellation = new CancellationTokenSource();
-        reconnectLifetime = reconnectCancellation;
+        Interlocked.Exchange(ref reconnectLifetime, reconnectCancellation);
         if (Volatile.Read(ref disconnectStarted) != 0)
         {
             reconnectCancellation.Cancel();
@@ -1364,8 +1376,20 @@ public partial class MainWindow : Window, IDisposable
                 },
                 reconnectCancellation.Token).ConfigureAwait(false);
 
+            var activated = false;
             await Dispatcher.InvokeAsync(() =>
-                ActivateReconnectedSession(runtime, failedSession, pendingReplacement!, mediaRestoreFailure));
+            {
+                if (Volatile.Read(ref disconnectStarted) == 0)
+                {
+                    ActivateReconnectedSession(runtime, failedSession, pendingReplacement!, mediaRestoreFailure);
+                    activated = true;
+                }
+            });
+            if (!activated)
+            {
+                return;
+            }
+
             pendingReplacement = null;
             await failedSession.DisposeAsync().ConfigureAwait(false);
         }
@@ -1380,7 +1404,13 @@ public partial class MainWindow : Window, IDisposable
                 if (ReferenceEquals(activeRuntime, runtime))
                 {
                     connectionFailed = true;
-                    SetStatus(LocalizationManager.Format("KVM 自动恢复失败：{0}", exception.Message), InputFailedBrush);
+                    SetStatus(
+                        exception is KvmReconnectException reconnectException
+                            ? LocalizationManager.Format(
+                                "KVM 自动恢复失败：已尝试 {0} 次，请检查网络和服务器状态。",
+                                reconnectException.AttemptCount)
+                            : LocalizationManager.Format("KVM 自动恢复失败：{0}", exception.Message),
+                        InputFailedBrush);
                     UpdateRemoteInputStatus();
                 }
             });
@@ -1397,13 +1427,34 @@ public partial class MainWindow : Window, IDisposable
                 CryptographicOperations.ZeroMemory(token);
             }
 
-            if (ReferenceEquals(reconnectLifetime, reconnectCancellation))
-            {
-                reconnectLifetime = null;
-            }
-
+            Interlocked.CompareExchange(ref reconnectLifetime, null, reconnectCancellation);
             reconnectCancellation.Dispose();
             Interlocked.Exchange(ref reconnectStarted, 0);
+        }
+    }
+
+    private void CancelReconnect()
+    {
+        var cancellation = Interlocked.Exchange(ref reconnectLifetime, null);
+        try
+        {
+            cancellation?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Completion owns disposal; a concurrent window close only needs best-effort cancellation.
+        }
+    }
+
+    private static void CancelSafely(CancellationTokenSource cancellation)
+    {
+        try
+        {
+            cancellation.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // A concurrent reconnect completion can already own and dispose this runtime lifetime.
         }
     }
 

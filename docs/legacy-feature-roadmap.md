@@ -58,8 +58,11 @@ verification on both firmware families remains pending.
 Implementation status (2026-07-15): the reconnect token, bounded supervisor,
 automatic MainWindow recovery, progress/final states, active-session replacement,
 current mouse/color preservation, and post-KVM virtual-media restoration are
-implemented with plain/encrypted token and retry loopback tests; desktop and
-authorized hardware failure injection remain pending.
+implemented with plain/encrypted token and retry loopback tests. A local-only
+150% DPI desktop scenario now covers graceful EOF, visible attempt progress,
+successful same-endpoint recovery, bounded exhaustion, and reconnect/close
+races. Authorized hardware failure injection and mounted-media restoration
+remain pending.
 
 - Parse and retain the server-issued 128-byte reconnect token only for the
   lifetime of the active connection.
@@ -75,7 +78,9 @@ Implementation status (2026-07-15): relative protocol negotiation, captured
 single-mouse interaction, Esc release, explicit local-pointer visibility,
 absolute/relative switching, and source-compatible synchronization reports are
 implemented without global hooks and covered by state, command, and loopback
-tests; desktop/high-DPI and hardware inspection remain pending.
+tests. Real desktop interaction at 150% DPI covers captured-pointer activation,
+hidden local pointer, Esc release, pointer visibility, and fifteen synchronization
+reports; authorized hardware inspection remains pending.
 
 - Add a session path that does not require absolute-mode acknowledgement.
 - Support relative mouse reports, mouse synchronization, single/captured mouse,
@@ -126,7 +131,8 @@ multi-blade hardware validation remains pending.
 Implementation status (2026-07-15): source-verified DQT and color-depth wire
 commands, `0x28` response processing, decoder reset/full-frame recovery, toolbar
 selectors, protocol loopback coverage, and UI option tests are complete;
-authorized hardware validation and desktop/high-DPI inspection remain pending.
+the 150% DPI desktop selector/wire scenario passes, and authorized hardware
+validation remains pending.
 
 - Expose the original DQT image-clarity control using command `0x27` and process
   its `0x28` response.
@@ -140,8 +146,9 @@ authorized hardware validation and desktop/high-DPI inspection remain pending.
 Implementation status (2026-07-15): all original presets, a bounded six-usage
 custom editor, guaranteed release reports, focused-viewer US/Japanese/French
 mapping, `0x04` lock-state processing, and N/C/S indicators are implemented
-with core, loopback, and UI-option tests; desktop/high-DPI and authorized
-hardware inspection remain pending.
+with core, loopback, and UI-option tests. The 150% DPI desktop scenario verifies
+all presets, layout switching, release reports, lock indicators, and six visible
+custom-key slots; authorized hardware inspection remains pending.
 
 - Add presets for Ctrl+Shift, Ctrl+Esc, Ctrl+Alt+Delete, Alt+Tab, Ctrl+Space, and
   keyboard reset.
@@ -157,8 +164,10 @@ hardware inspection remain pending.
 Implementation status (2026-07-15): the `0x23` forced power-cycle action,
 source privilege levels, login-to-session propagation, Core enforcement,
 capability-aware toolbar disabling, and operation-specific `0x51` denial events
-are implemented with parser, session-loopback, and UI-rule tests; authorized
-hardware and desktop/high-DPI inspection remain pending.
+are implemented with parser, session-loopback, and UI-rule tests. Administrator
+and user control availability plus every power-menu entry pass 150% DPI UI
+Automation inspection without invoking a power action; authorized hardware
+validation remains pending.
 
 - Expose the existing `0x23` forced power-cycle command with an explicit warning
   distinct from reset and graceful shutdown.
@@ -171,7 +180,7 @@ hardware and desktop/high-DPI inspection remain pending.
 
 ### Localization and help
 
-Implementation status (2026-07-15): 303 resource keys cover static and dynamic
+Implementation status (2026-07-15): 304 resource keys cover static and dynamic
 application text in Chinese, English, Japanese, and French. Help covers
 connection, input, recording, power, virtual media, and chassis workflows;
 About documents protocol compatibility and security boundaries. 48 UI
@@ -213,8 +222,12 @@ windows passed 150% DPI UI Automation and screenshot inspection.
 ## Current software verification baseline
 
 - Release build: 0 warnings, 0 errors.
-- Protocol tests: 166 passed; Core tests: 115 passed; App tests: 90 passed;
-  total 371 passed.
+- Protocol tests: 166 passed; Core tests: 116 passed; App tests: 90 passed;
+  total 372 passed.
+- Local-only desktop smoke: 56 checks across four real WPF scenarios at 150%
+  DPI, including capture/Esc release, DQT/color wire commands, six custom-key
+  slots, privilege-aware controls, graceful-EOF recovery, progress, success,
+  and retry exhaustion. No power or USB-reset command is emitted.
 - Four-language desktop verification: 48 checks at 150% DPI, with no
   untranslated user-visible text, interactive-control overflow, or trust-header
   overlap.

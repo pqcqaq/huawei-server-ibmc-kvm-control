@@ -12,6 +12,7 @@ The application is rebuilt from observed behavior and protocol analysis. It does
 - Remembered connection settings are opt-in and encrypted with Windows DPAPI for the current user.
 - Every connection can be cancelled and has bounded timeouts.
 - Self-signed iBMC certificates require an explicit per-connection trust decision.
+- The desktop smoke verifier is hard-coded to a loopback listener and rejects any observed power or USB-reset command; it never connects to target hardware.
 
 See `task_plan.md` and `progress.md` for the implementation and verification
 state. Source-verified parity, remaining hardware gates, and the evidence for
@@ -59,3 +60,9 @@ Credentials are not saved by default. When **记住此连接** is selected, a su
 Open **虚拟媒体** from the connected console toolbar. Optical and directory sources are always read-only. Closing the virtual-media window leaves current mounts active; disconnecting the KVM session closes VMM and deletes generated directory images.
 
 Move the pointer over the actual remote image to activate input. The lower-left indicator turns green only when the window, viewer focus, video frame, and pointer position all allow keyboard and mouse events to be sent. The client explicitly activates and focuses the video surface when the pointer enters or the window becomes active. Moving outside the remote image releases held remote keys/buttons and changes the indicator to blue. The top toolbar can be pinned or left to auto-hide; when hidden, its centered top handle remains visible and reveals the animated toolbar when the pointer moves over it.
+
+For the optional interactive desktop verification, build the solution and run
+`tests/IbmcKvm.DesktopSmoke/bin/Release/net9.0-windows/win-x64/IbmcKvm.DesktopSmoke.exe`.
+It opens local WPF windows, moves the pointer for captured-mouse checks, connects
+only to `127.0.0.1`, and writes screenshots/report data under
+`.artifacts/desktop-smoke`. It lists power-menu entries but never invokes them.

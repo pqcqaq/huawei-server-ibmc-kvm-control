@@ -63,6 +63,36 @@ public sealed class KvmClientSessionTests
     }
 
     [Fact]
+    public async Task TreatsUnexpectedGracefulEofAsSessionFailure()
+    {
+        var listener = StartListener();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var closeConnection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var serverTask = RunServerAsync(listener, async (stream, cancellationToken) =>
+        {
+            await CompleteHandshakeAsync(stream, cancellationToken);
+            await closeConnection.Task.WaitAsync(cancellationToken);
+        }, timeout.Token);
+
+        await using var session = await KvmClientSession.ConnectAsync(
+            new KvmConnectionOptions("127.0.0.1", GetPort(listener), 7),
+            timeout.Token);
+        closeConnection.TrySetResult();
+        await serverTask;
+
+        var exception = await Assert.ThrowsAsync<EndOfStreamException>(async () =>
+        {
+            await foreach (var _ in session.ReadFramesAsync(timeout.Token))
+            {
+            }
+        });
+
+        Assert.Equal("The KVM connection closed unexpectedly.", exception.Message);
+        Assert.Same(exception, session.Failure);
+        Assert.Equal(KvmSessionState.Faulted, session.State);
+    }
+
+    [Fact]
     public async Task SendsEncryptedKeyboardAndAbsoluteMouseForTheModernSession()
     {
         var listener = StartListener();
@@ -761,6 +791,7 @@ public sealed class KvmClientSessionTests
         {
             await CompleteHandshakeAsync(stream, cancellationToken);
             await ReadUntilVirtualMediaQueryAsync(stream, cancellationToken);
+            await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationToken);
         }, timeout.Token);
 
         await using var session = await KvmClientSession.ConnectAsync(

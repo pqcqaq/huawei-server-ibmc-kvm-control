@@ -7,6 +7,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/IbmcKvm.App.Tests/IbmcKvm.App.Tests.csproj" />
     <Project Path="tests/IbmcKvm.Core.Tests/IbmcKvm.Core.Tests.csproj" />
+    <Project Path="tests/IbmcKvm.DesktopSmoke/IbmcKvm.DesktopSmoke.csproj" />
     <Project Path="tests/IbmcKvm.Protocol.Tests/IbmcKvm.Protocol.Tests.csproj" />
   </Folder>
 </Solution>

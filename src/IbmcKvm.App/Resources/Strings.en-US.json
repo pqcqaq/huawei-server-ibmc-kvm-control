@@ -234,6 +234,7 @@
   "截图已保存：{0}": "Screenshot saved: {0}",
   "刀片 {0} 连接中断，正在尝试恢复：{1}": "Blade {0} disconnected; attempting recovery: {1}",
   "KVM 自动恢复失败：{0}": "Automatic KVM recovery failed: {0}",
+  "KVM 自动恢复失败：已尝试 {0} 次，请检查网络和服务器状态。": "Automatic KVM recovery failed after {0} attempts. Check the network and server status.",
   "KVM 连接已自动恢复": "KVM connection recovered automatically",
   "KVM 已恢复，但虚拟介质恢复失败：{0}": "KVM recovered, but virtual-media recovery failed: {0}",
   "正在恢复 KVM（{0}/{1}）": "Recovering KVM ({0}/{1})",

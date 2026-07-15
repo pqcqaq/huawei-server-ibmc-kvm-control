@@ -25,15 +25,16 @@
 23. [x] Animate floating-toolbar transitions and retain a visible top-edge reveal handle while hidden.
 24. [x] Implement the complete encrypted KVM session path, including encrypted video and KVM-side VMM negotiation; hardware verification remains a separate read-only gate.
 25. [x] Add older iBMC/iMana variant detection and managed RMCP+/OEM compatibility adapters; authorized legacy hardware verification remains pending.
-26. [x] Add bounded KVM reconnect, reconnect-token handling, and virtual-media restoration; desktop and authorized hardware failure injection remain pending.
-27. [x] Add relative/captured mouse modes, cursor synchronization, and local-pointer controls; desktop/high-DPI and hardware inspection remain pending.
+26. [x] Add bounded KVM reconnect, reconnect-token handling, and virtual-media restoration; 150% DPI desktop failure injection passes and authorized hardware/media restoration remain pending.
+27. [x] Add relative/captured mouse modes, cursor synchronization, and local-pointer controls; 150% DPI desktop inspection passes and hardware inspection remains pending.
 28. [x] Add local recording with original recording controls, `.rep` compatibility, and standard AVI export; Windows WPF MediaElement playback inspection passed.
 29. [x] Add source-compatible 14-slot chassis discovery, bounded four-session management, monitoring, selected-command routing, tabs, and read-only split-screen viewing; authorized multi-blade hardware validation remains pending.
-30. [x] Add DQT image-quality and selectable color-depth controls; authorized hardware and desktop/high-DPI verification remain pending.
-31. [x] Add the complete special-key set, custom combinations, keyboard layouts, and remote lock-state indicators; desktop/high-DPI and hardware inspection remain pending.
-32. [x] Expose forced power cycle and make KVM, power, and virtual-media controls privilege-aware; desktop/high-DPI and hardware inspection remain pending.
+30. [x] Add DQT image-quality and selectable color-depth controls; 150% DPI desktop verification passes and authorized hardware remains pending.
+31. [x] Add the complete special-key set, custom combinations, keyboard layouts, and remote lock-state indicators; 150% DPI desktop inspection passes and hardware inspection remains pending.
+32. [x] Expose forced power cycle and make KVM, power, and virtual-media controls privilege-aware; 150% DPI privilege/menu inspection passes without invoking power, and hardware inspection remains pending.
 33. [x] Add Chinese, English, Japanese, and French resources, maintained help, and an About view; 303 keys and 150% DPI four-language checks pass.
 34. [x] Add explicit persistent certificate trust import, inspection, review, and revocation; scoped DPAPI records reject changed certificates.
+35. [x] Add a local-only desktop smoke runner, treat unexpected EOF as reconnectable failure, harden reconnect/close races, and verify progress, success, exhaustion, controls, and six-key layout at 150% DPI without emitting power or USB-reset commands.
 
 All scoped legacy-parity software capabilities are implemented and prioritized in `docs/legacy-feature-roadmap.md`; remaining entries are validation gates. Destructive virtual-media hardware operations are implemented but are not exercised while the target session is restricted to read-only verification.
 

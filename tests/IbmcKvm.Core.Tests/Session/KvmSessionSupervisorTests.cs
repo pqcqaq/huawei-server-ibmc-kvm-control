@@ -59,6 +59,8 @@ public sealed class KvmSessionSupervisorTests
             }));
 
         Assert.IsType<UnauthorizedAccessException>(exception.InnerException);
+        Assert.Equal(1, exception.AttemptCount);
+        Assert.Equal(2, exception.MaximumAttempts);
         Assert.Equal(1, attempts);
     }
 

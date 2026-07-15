@@ -53,17 +53,19 @@ Last updated: 2026-07-15
 - [x] Chinese/English/Japanese/French localization for static and dynamic application text, maintained help, About/protocol compatibility view, and 150% DPI verification
 - [x] Scoped DPAPI certificate trust management for server fingerprints and CAs, certificate inspection/revocation, changed-certificate rejection, and 150% DPI verification
 - [x] Standard MJPEG AVI playback through Windows WPF MediaElement with advancing timeline and different decoded screen frames
+- [x] Unexpected graceful KVM EOF is treated as a reconnectable failure; frame-channel faults, silent chassis probing, and reconnect/window-close cancellation races are handled without an unobserved desktop exception
+- [x] Local-only 150% DPI desktop smoke: 56 executable UI Automation, wire, input, layout, permission, reconnect-progress/success/exhaustion, and screenshot checks across four scenarios; no power or USB-reset command is emitted
 
 ## Pending
 
 - [ ] P0: hardware verification of the completed encrypted KVM session path (automated implementation and oracle coverage are complete)
 - [ ] P0: authorized hardware verification of the implemented older iBMC/iMana RMCP+ and KVM adapters
-- [ ] P1: desktop and authorized hardware failure-injection validation of automatic reconnect and media restoration
-- [ ] P1: desktop/high-DPI and authorized hardware validation of captured mouse, synchronization, and pointer release
+- [ ] P1: authorized hardware failure-injection validation of automatic reconnect and mounted-media restoration (desktop KVM recovery passes)
+- [ ] P1: authorized hardware validation of captured mouse, synchronization, and pointer release (desktop/high-DPI passes)
 - [ ] P1: authorized multi-blade chassis hardware validation (the available single-node target does not return chassis presence data)
-- [ ] P2: authorized hardware and desktop/high-DPI validation of the implemented DQT and 8/7/6/4-bit color-depth controls
-- [ ] P2: desktop/high-DPI and authorized hardware inspection of the implemented special keys, layouts, and lock indicators
-- [ ] P2: desktop/high-DPI and authorized hardware validation of forced power cycle and privilege-aware controls
+- [ ] P2: authorized hardware validation of the implemented DQT and 8/7/6/4-bit color-depth controls (desktop/high-DPI passes)
+- [ ] P2: authorized hardware inspection of the implemented special keys, layouts, and lock indicators (desktop/high-DPI passes)
+- [ ] P2: authorized hardware validation of forced power cycle and privilege-aware controls (desktop menu/permission inspection passes without invoking power)
 - [ ] Destructive target validation of mount/eject/USB reset (intentionally not run under the read-only constraint)
 
 ## Verification log
@@ -92,8 +94,9 @@ Last updated: 2026-07-15
 - Recording verification: `.rep` linked indexes beyond 20 I-frames, bounded drop behavior, RIFF/MJPG/`idx1` bytes, valid WPF JPEG chunks, and resolution normalization passed
 - Chassis verification: 14-slot reserved-bit mapping, absent/reset/unsupported/KVM busy/SOL/loading/available states, shared/exclusive queries, monitor/stop commands, four-session limit, cleanup, replacement ownership, selected-control routing, and read-only split rules passed
 - Chassis desktop inspection: connected 720x400 console and complete toolbar inspected at 150% DPI; UI Automation found zero button or selector bounds outside the 1920x1200 window. The target exposed no chassis bitmap, so live tabs/split remain a multi-blade hardware gate.
-- Current full suite: 371 passed (Protocol 166, Core 115, App 90); Release build 0 warnings, 0 errors
-- Dynamic localization behavior: 303 keys in each language, parameterized status/certificate formatting, and no canonical-key translation collisions passed
+- Current full suite: 372 passed (Protocol 166, Core 116, App 90); Release build 0 warnings, 0 errors
+- Dynamic localization behavior: 304 keys in each language, parameterized status/certificate/reconnect formatting, and no canonical-key translation collisions passed
+- Desktop loopback smoke: 56 checks across administrator controls, user permissions, graceful-EOF reconnect success, and retry exhaustion at 150% DPI; UI Automation found no required control missing or interactive control outside its window, all six custom key slots are visible, and the captured wire contains no `0x20`/`0x21`/`0x22`/`0x23`/`0x25`/`0x30` command
 - Desktop localization verification: 48 UI Automation/screenshot checks across zh-CN, en-US, ja-JP, and fr-FR at 150% DPI; no untranslated text, interactive overflow, or trust-header overlap
 - External AVI playback: Windows WPF MediaElement opened the generated 320x240/2-second MJPEG sample; playback positions 0.422s and 1.433s yielded different screen-frame SHA-256 hashes
 - Java input oracle: AES-CBC keyboard payload vectors match `com.kvm.AESHandler.encry` from the original JAR

@@ -1,8 +1,8 @@
 <Window x:Class="IbmcKvm.App.CustomKeyCombinationWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="自定义组合键" Width="560" Height="310"
-        MinWidth="520" MinHeight="290" ResizeMode="CanResize"
+        Title="自定义组合键" Width="560" Height="400"
+        MinWidth="520" MinHeight="380" ResizeMode="CanResize"
         WindowStartupLocation="CenterOwner" Background="#111714" ShowInTaskbar="False">
     <Grid Margin="24">
         <Grid.RowDefinitions>

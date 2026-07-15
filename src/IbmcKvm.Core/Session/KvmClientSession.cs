@@ -1252,6 +1252,11 @@ public sealed class KvmClientSession : IAsyncDisposable
                     }
                 }
             }
+
+            if (!lifetime.IsCancellationRequested)
+            {
+                SetFailure(new EndOfStreamException("The KVM connection closed unexpectedly."));
+            }
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
         {
