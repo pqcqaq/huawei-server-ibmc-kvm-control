@@ -1,5 +1,6 @@
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using System.Threading.Channels;
 using IbmcKvm.Protocol.Wire;
 
@@ -9,7 +10,7 @@ namespace IbmcKvm.Protocol.Transport;
 /// Owns the asynchronous read/write pumps for one KVM TCP stream. Both queues
 /// are bounded, and no synchronous network operation is exposed to callers.
 /// </summary>
-public sealed class LegacyTcpConnection : IAsyncDisposable
+public sealed class LegacyTcpConnection : IKvmPacketConnection
 {
     private readonly Stream stream;
     private readonly IAsyncDisposable? owner;
@@ -91,16 +92,37 @@ public sealed class LegacyTcpConnection : IAsyncDisposable
         int queueCapacity = 128) =>
         new(stream, ownsStream ? new StreamOwner(stream) : null, maximumPacketLength, queueCapacity);
 
-    public ValueTask SendPacketAsync(
+    public async ValueTask SendPacketAsync(
         int codeKey,
         ReadOnlyMemory<byte> payload,
-        CancellationToken cancellationToken = default) =>
-        SendAsync(LegacyPacketEncoder.Encode(codeKey, payload.Span), cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        var encoded = LegacyPacketEncoder.Encode(codeKey, payload.Span);
+        try
+        {
+            await SendAsync(encoded, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(encoded);
+        }
+    }
 
-    public ValueTask SendAsync(ReadOnlyMemory<byte> encodedPacket, CancellationToken cancellationToken = default)
+    public async ValueTask SendAsync(
+        ReadOnlyMemory<byte> encodedPacket,
+        CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
-        return outbound.Writer.WriteAsync(encodedPacket.ToArray(), cancellationToken);
+        var queued = encodedPacket.ToArray();
+        try
+        {
+            await outbound.Writer.WriteAsync(queued, cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            CryptographicOperations.ZeroMemory(queued);
+            throw;
+        }
     }
 
     public async IAsyncEnumerable<LegacyPacket> ReadPacketsAsync(
@@ -145,12 +167,26 @@ public sealed class LegacyTcpConnection : IAsyncDisposable
         {
             await foreach (var packet in outbound.Reader.ReadAllAsync(lifetime.Token).ConfigureAwait(false))
             {
-                await stream.WriteAsync(packet, lifetime.Token).ConfigureAwait(false);
-                await stream.FlushAsync(lifetime.Token).ConfigureAwait(false);
+                try
+                {
+                    await stream.WriteAsync(packet, lifetime.Token).ConfigureAwait(false);
+                    await stream.FlushAsync(lifetime.Token).ConfigureAwait(false);
+                }
+                finally
+                {
+                    CryptographicOperations.ZeroMemory(packet);
+                }
             }
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
         {
+        }
+        finally
+        {
+            while (outbound.Reader.TryRead(out var packet))
+            {
+                CryptographicOperations.ZeroMemory(packet);
+            }
         }
     }
 

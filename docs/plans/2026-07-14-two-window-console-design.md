@@ -8,7 +8,7 @@
 
 ## Toolbar behavior
 
-The toolbar is a sibling overlay above the video surface so its buttons never participate in video hit testing. The left toggle controls `FloatingToolbarState`: pinned mode keeps it visible, while unpinned mode hides it after the pointer leaves and a short delay elapses. The top reveal zone and the first 72 device-independent pixels of the console reveal it again. The rightmost button always disconnects; the middle buttons expose virtual media, screenshot, keyboard release/ Ctrl+Alt+Delete, full-screen, and confirmed power actions.
+The toolbar is a sibling overlay above the video surface so its buttons never participate in video hit testing. The left toggle controls `FloatingToolbarState`: pinned mode keeps it visible, while unpinned mode hides it after the pointer leaves and a short delay elapses. Show and hide transitions use a 160 ms opacity and vertical-position animation; the client falls back to immediate state changes when Windows client-area animations are disabled. Once hidden, a centered 120 x 7 pixel green handle remains visible inside the top reveal zone and above remote-video overlays. The handle and the first 72 device-independent pixels of the console reveal the toolbar again. The rightmost button always disconnects; the middle buttons expose virtual media, screenshot, keyboard release/ Ctrl+Alt+Delete, full-screen, and confirmed power actions.
 
 ## Input safety
 
@@ -17,6 +17,6 @@ The video surface remains the only input target. On window activation, pointer e
 ## Verification
 
 - `LoginPresentationTests` execute loading and failure transitions.
-- `FloatingToolbarStateTests` execute pin, delayed-hide, and reveal transitions.
+- `FloatingToolbarStateTests` execute pin, delayed-hide, reveal, and show/hide transition decisions.
 - Existing input-state tests remain in the application suite.
 - Release build and all solution tests run with an alternate output directory while an existing client process is left untouched.

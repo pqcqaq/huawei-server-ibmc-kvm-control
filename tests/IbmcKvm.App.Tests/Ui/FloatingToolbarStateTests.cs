@@ -18,10 +18,11 @@ public sealed class FloatingToolbarStateTests
     {
         var state = new FloatingToolbarState(isPinned: true);
 
-        state.HideAfterPointerLeaves(isPointerOverToolbar: false);
+        var transition = state.HideAfterPointerLeaves(isPointerOverToolbar: false);
 
         Assert.True(state.IsVisible);
         Assert.True(state.IsPinned);
+        Assert.Equal(FloatingToolbarTransition.None, transition);
     }
 
     [Fact]
@@ -29,11 +30,13 @@ public sealed class FloatingToolbarStateTests
     {
         var state = new FloatingToolbarState(isPinned: false);
 
-        state.HideAfterPointerLeaves(isPointerOverToolbar: true);
+        var transitionWhileOver = state.HideAfterPointerLeaves(isPointerOverToolbar: true);
         Assert.True(state.IsVisible);
+        Assert.Equal(FloatingToolbarTransition.None, transitionWhileOver);
 
-        state.HideAfterPointerLeaves(isPointerOverToolbar: false);
+        var transition = state.HideAfterPointerLeaves(isPointerOverToolbar: false);
         Assert.False(state.IsVisible);
+        Assert.Equal(FloatingToolbarTransition.Hide, transition);
     }
 
     [Fact]
@@ -42,9 +45,10 @@ public sealed class FloatingToolbarStateTests
         var state = new FloatingToolbarState(isPinned: false);
         state.HideAfterPointerLeaves(isPointerOverToolbar: false);
 
-        state.Reveal();
+        var transition = state.Reveal();
 
         Assert.True(state.IsVisible);
         Assert.False(state.IsPinned);
+        Assert.Equal(FloatingToolbarTransition.Show, transition);
     }
 }

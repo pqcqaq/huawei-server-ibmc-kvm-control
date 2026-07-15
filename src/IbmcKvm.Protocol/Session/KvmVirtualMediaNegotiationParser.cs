@@ -4,6 +4,13 @@ namespace IbmcKvm.Protocol.Session;
 
 public sealed record KvmVirtualMediaCredential(byte BladeNumber, byte[] Credential, byte[] Salt);
 
+public enum KvmPrivilegeDenial
+{
+    None,
+    Power,
+    VirtualMedia,
+}
+
 public static class KvmVirtualMediaNegotiationParser
 {
     public const int CredentialLength = 20;
@@ -50,4 +57,11 @@ public static class KvmVirtualMediaNegotiationParser
     }
 
     public static bool IsDeniedPrivilege(byte state) => state is 2 or 3;
+
+    public static KvmPrivilegeDenial GetPrivilegeDenial(byte state) => state switch
+    {
+        1 => KvmPrivilegeDenial.Power,
+        2 or 3 => KvmPrivilegeDenial.VirtualMedia,
+        _ => KvmPrivilegeDenial.None,
+    };
 }

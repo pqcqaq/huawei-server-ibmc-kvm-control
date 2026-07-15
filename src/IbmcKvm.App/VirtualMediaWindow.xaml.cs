@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using IbmcKvm.App.VirtualMedia;
 using IbmcKvm.Core.VirtualMedia;
 using Microsoft.Win32;
+using IbmcKvm.App.Localization;
 
 namespace IbmcKvm.App;
 
@@ -33,14 +34,14 @@ public partial class VirtualMediaWindow : Window, IDisposable
             var capability = await controller.QueryCapabilityAsync(lifetime.Token);
             CapabilityText.Text = capability.Available
                 ? $"VMM {capability.Port} · PBKDF2 suite {capability.CipherSuite.Algorithm}"
-                : "VMM 不可用";
+                : LocalizationManager.Translate("VMM 不可用");
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
         {
         }
         catch (Exception exception)
         {
-            CapabilityText.Text = "VMM 查询失败";
+            CapabilityText.Text = LocalizationManager.Translate("VMM 查询失败");
             OperationStatusText.Text = exception.Message;
         }
     }
@@ -73,8 +74,8 @@ public partial class VirtualMediaWindow : Window, IDisposable
     {
         var dialog = new OpenFileDialog
         {
-            Title = "选择软盘镜像",
-            Filter = "软盘镜像 (*.img)|*.img|所有文件 (*.*)|*.*",
+            Title = LocalizationManager.Translate("选择软盘镜像"),
+            Filter = LocalizationManager.Translate("软盘镜像 (*.img)|*.img|所有文件 (*.*)|*.*"),
             CheckFileExists = true,
         };
         if (dialog.ShowDialog(this) == true)
@@ -87,7 +88,11 @@ public partial class VirtualMediaWindow : Window, IDisposable
     {
         if (GetSource(OpticalSourceComboBox) == VirtualMediaSourceKind.Directory)
         {
-            var dialog = new OpenFolderDialog { Title = "选择映射目录", Multiselect = false };
+            var dialog = new OpenFolderDialog
+            {
+                Title = LocalizationManager.Translate("选择映射目录"),
+                Multiselect = false,
+            };
             if (dialog.ShowDialog(this) == true)
             {
                 OpticalPathTextBox.Text = dialog.FolderName;
@@ -98,8 +103,8 @@ public partial class VirtualMediaWindow : Window, IDisposable
 
         var fileDialog = new OpenFileDialog
         {
-            Title = "选择光盘镜像",
-            Filter = "光盘镜像 (*.iso)|*.iso|所有文件 (*.*)|*.*",
+            Title = LocalizationManager.Translate("选择光盘镜像"),
+            Filter = LocalizationManager.Translate("光盘镜像 (*.iso)|*.iso|所有文件 (*.*)|*.*"),
             CheckFileExists = true,
         };
         if (fileDialog.ShowDialog(this) == true)
@@ -154,7 +159,9 @@ public partial class VirtualMediaWindow : Window, IDisposable
                         OpticalProgressBar.Value = value.TotalItems == 0
                             ? 100
                             : value.CompletedItems * 100d / value.TotalItems;
-                        OperationStatusText.Text = $"正在生成目录光盘 · {Path.GetFileName(value.CurrentPath)}";
+                        OperationStatusText.Text = LocalizationManager.Format(
+                            "正在生成目录光盘 · {0}",
+                            Path.GetFileName(value.CurrentPath));
                     });
                     await controller.MountDirectoryAsync(OpticalPathTextBox.Text, progress, cancellationToken);
                     break;
@@ -177,7 +184,7 @@ public partial class VirtualMediaWindow : Window, IDisposable
         await CreateSelectedImageAsync(
             FloppyDriveComboBox,
             MediaDeviceKind.Floppy,
-            "软盘镜像 (*.img)|*.img",
+            LocalizationManager.Translate("软盘镜像 (*.img)|*.img"),
             ".img",
             FloppyProgressBar);
 
@@ -185,7 +192,7 @@ public partial class VirtualMediaWindow : Window, IDisposable
         await CreateSelectedImageAsync(
             OpticalDriveComboBox,
             MediaDeviceKind.Optical,
-            "光盘镜像 (*.iso)|*.iso",
+            LocalizationManager.Translate("光盘镜像 (*.iso)|*.iso"),
             ".iso",
             OpticalProgressBar);
 
@@ -203,7 +210,12 @@ public partial class VirtualMediaWindow : Window, IDisposable
         catch (Exception exception)
         {
             OperationStatusText.Text = exception.Message;
-            MessageBox.Show(this, exception.Message, "无法制作镜像", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(
+                this,
+                exception.Message,
+                LocalizationManager.Translate("无法制作镜像"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
     }
 
@@ -215,7 +227,7 @@ public partial class VirtualMediaWindow : Window, IDisposable
     {
         var dialog = new SaveFileDialog
         {
-            Title = "保存介质镜像",
+            Title = LocalizationManager.Translate("保存介质镜像"),
             Filter = filter,
             DefaultExt = extension,
             AddExtension = true,
@@ -232,7 +244,7 @@ public partial class VirtualMediaWindow : Window, IDisposable
             var progress = new Progress<MediaCopyProgress>(value =>
             {
                 progressBar.Value = value.Percentage;
-                OperationStatusText.Text = $"正在制作镜像 · {value.Percentage:0}%";
+                OperationStatusText.Text = LocalizationManager.Format("正在制作镜像 · {0:0}%", value.Percentage);
             });
             await controller.CreateImageAsync(source, dialog.FileName, progress, cancellationToken);
         });
@@ -266,8 +278,8 @@ public partial class VirtualMediaWindow : Window, IDisposable
     {
         var answer = MessageBox.Show(
             this,
-            "确认重置远端 USB 虚拟媒体设备？当前挂载的虚拟介质可能会短暂断开。",
-            "确认 USB reset",
+            LocalizationManager.Translate("确认重置远端 USB 虚拟媒体设备？当前挂载的虚拟介质可能会短暂断开。"),
+            LocalizationManager.Translate("确认 USB reset"),
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning,
             MessageBoxResult.No);
@@ -290,13 +302,13 @@ public partial class VirtualMediaWindow : Window, IDisposable
         }
 
         SetBusy(true);
-        OperationStatusText.Text = status;
+        OperationStatusText.Text = LocalizationManager.Translate(status);
         try
         {
             await operation(lifetime.Token);
             if (showSuccess)
             {
-                OperationStatusText.Text = "操作完成";
+                OperationStatusText.Text = LocalizationManager.Translate("操作完成");
             }
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
@@ -305,7 +317,12 @@ public partial class VirtualMediaWindow : Window, IDisposable
         catch (Exception exception)
         {
             OperationStatusText.Text = exception.Message;
-            MessageBox.Show(this, exception.Message, "虚拟媒体操作失败", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(
+                this,
+                exception.Message,
+                LocalizationManager.Translate("虚拟媒体操作失败"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
         finally
         {
@@ -333,20 +350,25 @@ public partial class VirtualMediaWindow : Window, IDisposable
     {
         _ = Dispatcher.InvokeAsync(() =>
         {
+            var state = LocalizationManager.Translate(status.State);
             var text = status.IsMounted
-                ? $"{status.State} · {status.DisplayName} · {(status.IsReadOnly ? "只读" : "可写")}"
-                : status.State;
+                ? LocalizationManager.Format(
+                    "{0} · {1} · {2}",
+                    state,
+                    status.DisplayName,
+                    LocalizationManager.Translate(status.IsReadOnly ? "只读" : "可写"))
+                : state;
             if (status.DeviceKind == MediaDeviceKind.Floppy)
             {
                 floppyMounted = status.IsMounted;
                 FloppyStatusText.Text = text;
-                MountFloppyButton.Content = status.IsMounted ? "更换" : "挂载";
+                MountFloppyButton.Content = LocalizationManager.Translate(status.IsMounted ? "更换" : "挂载");
             }
             else
             {
                 opticalMounted = status.IsMounted;
                 OpticalStatusText.Text = text;
-                MountOpticalButton.Content = status.IsMounted ? "更换" : "挂载";
+                MountOpticalButton.Content = LocalizationManager.Translate(status.IsMounted ? "更换" : "挂载");
             }
 
             SetBusy(busy);
@@ -387,14 +409,15 @@ public partial class VirtualMediaWindow : Window, IDisposable
     {
         if (comboBox.SelectedItem is not PhysicalDriveDescriptor drive)
         {
-            throw new InvalidOperationException(kind == MediaDeviceKind.Floppy
+            throw new InvalidOperationException(LocalizationManager.Translate(kind == MediaDeviceKind.Floppy
                 ? "未检测到可用的物理软驱。"
-                : "未检测到可用的物理光驱。");
+                : "未检测到可用的物理光驱。"));
         }
 
         if (!drive.IsReady)
         {
-            throw new InvalidOperationException($"{drive.DisplayName} 中没有就绪的介质。");
+            throw new InvalidOperationException(
+                LocalizationManager.Format("{0} 中没有就绪的介质。", drive.DisplayName));
         }
 
         return drive;
@@ -404,7 +427,7 @@ public partial class VirtualMediaWindow : Window, IDisposable
     {
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
         {
-            throw new FileNotFoundException("请选择存在的镜像文件。", path);
+            throw new FileNotFoundException(LocalizationManager.Translate("请选择存在的镜像文件。"), path);
         }
     }
 
@@ -412,7 +435,7 @@ public partial class VirtualMediaWindow : Window, IDisposable
     {
         if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
         {
-            throw new DirectoryNotFoundException("请选择存在的本地目录。");
+            throw new DirectoryNotFoundException(LocalizationManager.Translate("请选择存在的本地目录。"));
         }
     }
 

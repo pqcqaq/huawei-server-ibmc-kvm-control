@@ -15,6 +15,7 @@
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0" Background="#18211E">
+            <Grid>
             <StackPanel Margin="42,30,42,24">
                 <StackPanel Orientation="Horizontal">
                     <Border Width="38" Height="38" Background="#159B65" CornerRadius="4" Margin="0,0,13,0">
@@ -30,6 +31,21 @@
                 <TextBlock Text="连接服务器后将自动进入全屏控制界面"
                            Foreground="#B9C5BF" FontSize="11" Margin="1,18,0,0" />
             </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top"
+                            Margin="0,18,22,0">
+                    <ComboBox x:Name="LanguageComboBox" Width="112" Height="30" Margin="0,4,5,0"
+                              DisplayMemberPath="DisplayName" SelectedValuePath="CultureName"
+                              SelectionChanged="LanguageComboBox_SelectionChanged" ToolTip="界面语言" />
+                    <Button x:Name="TrustManagerButton" Style="{StaticResource OverlayToolButton}"
+                            Click="TrustManagerButton_Click" ToolTip="查看、导入或撤销证书信任">
+                        <TextBlock Text="&#xE8D7;" FontFamily="Segoe Fluent Icons" FontSize="16" Foreground="White" />
+                    </Button>
+                    <Button x:Name="HelpMenuButton" Style="{StaticResource OverlayToolButton}"
+                            Click="HelpMenuButton_Click" ToolTip="帮助与关于">
+                        <TextBlock Text="&#xE897;" FontFamily="Segoe Fluent Icons" FontSize="16" Foreground="White" />
+                    </Button>
+                </StackPanel>
+            </Grid>
         </Border>
 
         <Grid Grid.Row="1" Margin="42,24,42,28">

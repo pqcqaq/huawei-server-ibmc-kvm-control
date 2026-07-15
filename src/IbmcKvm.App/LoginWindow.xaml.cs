@@ -1,10 +1,14 @@
 using System.ComponentModel;
 using System.IO;
+using System.Net.Http;
+using System.Net.Sockets;
+using System.Security.Authentication;
 using System.Net.Security;
 using System.Security.Cryptography;
 using System.Windows;
 using IbmcKvm.App.Settings;
 using IbmcKvm.App.Ui;
+using IbmcKvm.App.Localization;
 using IbmcKvm.Core.Session;
 using IbmcKvm.Protocol.Login;
 using IbmcKvm.Protocol.Session;
@@ -14,14 +18,32 @@ namespace IbmcKvm.App;
 public partial class LoginWindow : Window, IDisposable
 {
     private readonly EncryptedSettingsStore settingsStore = new();
+    private readonly CertificateTrustStore certificateTrustStore = new();
+    private readonly UiPreferencesStore uiPreferencesStore = new();
+    private bool applyingLanguageSelection;
     private readonly CancellationTokenSource windowLifetime = new();
     private int disposed;
 
     public LoginWindow()
     {
         InitializeComponent();
+        LanguageComboBox.ItemsSource = LocalizationCatalog.SupportedLanguages;
+        applyingLanguageSelection = true;
+        LanguageComboBox.SelectedValue = LocalizationManager.CurrentCultureName;
+        applyingLanguageSelection = false;
         LoadSavedConnectionSettings();
         ApplyLoginState(LoginPhase.Ready);
+    }
+
+    private void LanguageComboBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (applyingLanguageSelection || LanguageComboBox.SelectedValue is not string cultureName)
+        {
+            return;
+        }
+
+        uiPreferencesStore.SaveCulture(cultureName);
+        LocalizationManager.SetCulture(cultureName);
     }
 
     private async void ConnectButton_Click(object sender, RoutedEventArgs e)
@@ -39,43 +61,26 @@ public partial class LoginWindow : Window, IDisposable
             var password = PasswordInput.Password;
             if (string.IsNullOrWhiteSpace(userName) || string.IsNullOrEmpty(password))
             {
-                throw new InvalidOperationException("请输入用户名和密码。");
+                throw new InvalidOperationException(LocalizationManager.Translate("请输入用户名和密码。"));
             }
 
             var mode = ModeComboBox.SelectedIndex == 1 ? ConnectionMode.Exclusive : ConnectionMode.Shared;
-            var (policy, fingerprint) = await ResolveCertificatePolicyAsync(endpoint, operation.Token);
-            SetLoadingStatus("正在验证账号与远程控制权限");
-            using var httpClient = IbmcLoginClient.CreateHttpClient(policy, fingerprint);
-            var loginClient = new IbmcLoginClient(httpClient, TimeSpan.FromSeconds(20));
-            var login = await loginClient.LoginAsync(
+            var connected = await ConnectWithDiscoveryAsync(
                 endpoint,
-                new LoginRequest(userName, password, mode),
+                userName,
+                password,
+                mode,
                 operation.Token);
-            if (!login.IsSuccess)
-            {
-                throw new InvalidOperationException(GetLoginError(login));
-            }
-
-            SetLoadingStatus("正在协商 KVM 视频与输入通道");
-            var verificationKey = SessionVerificationKey.Parse(
-                login.VerifyValue ?? throw new FormatException("登录响应缺少 KVM 校验值。"));
-            var kvmPort = login.KvmPort ?? throw new FormatException("登录响应缺少 KVM 端口。");
-            connectedSession = await KvmClientSession.ConnectAsync(
-                new KvmConnectionOptions(
-                    endpoint.Host,
-                    kvmPort,
-                    verificationKey.WireValue,
-                    Encrypted: login.KvmEncrypted,
-                    ExtendedVerifyValue: login.ExtendedVerifyValue,
-                    VirtualMediaEncrypted: login.VirtualMediaEncrypted),
-                operation.Token);
+            connectedSession = connected.Session;
+            var kvmPort = connected.Port;
 
             var settingsPersisted = PersistConnectionSettings(address, userName, password, mode);
             PasswordInput.Clear();
             var consoleWindow = new MainWindow(
                 connectedSession,
                 $"{endpoint.Host}:{kvmPort}",
-                settingsPersisted);
+                settingsPersisted,
+                mode == ConnectionMode.Exclusive);
             connectedSession = null;
             Application.Current.MainWindow = consoleWindow;
             consoleWindow.Show();
@@ -83,11 +88,11 @@ public partial class LoginWindow : Window, IDisposable
         }
         catch (OperationCanceledException) when (!windowLifetime.IsCancellationRequested)
         {
-            ApplyLoginState(LoginPhase.Failed, "连接已取消或超时，请检查网络后重试。");
+            ApplyLoginState(LoginPhase.Failed, LocalizationManager.Translate("连接已取消或超时，请检查网络后重试。"));
         }
         catch (Exception exception) when (!windowLifetime.IsCancellationRequested)
         {
-            ApplyLoginState(LoginPhase.Failed, exception.Message);
+            ApplyLoginState(LoginPhase.Failed, LocalizationManager.Translate(exception.Message));
         }
         finally
         {
@@ -98,38 +103,172 @@ public partial class LoginWindow : Window, IDisposable
         }
     }
 
-    private async Task<(ServerCertificatePolicy Policy, string? Fingerprint)> ResolveCertificatePolicyAsync(
+    private async Task<ConnectedKvm> ConnectWithDiscoveryAsync(
+        IbmcEndpoint endpoint,
+        string userName,
+        string password,
+        ConnectionMode mode,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var certificate = await ResolveCertificatePolicyAsync(endpoint, cancellationToken);
+            SetLoadingStatus("正在验证账号与远程控制权限");
+            using var httpClient = IbmcLoginClient.CreateHttpClient(
+                certificate.Policy,
+                certificate.Fingerprint,
+                certificate.AuthorityCertificates);
+            var login = await new IbmcLoginClient(httpClient, TimeSpan.FromSeconds(20)).LoginAsync(
+                endpoint,
+                new LoginRequest(userName, password, mode),
+                cancellationToken);
+            if (!login.IsSuccess)
+            {
+                throw new InvalidOperationException(GetLoginError(login));
+            }
+
+            var verificationKey = SessionVerificationKey.Parse(
+                login.VerifyValue ?? throw new FormatException(LocalizationManager.Translate("登录响应缺少 KVM 校验值。")));
+            var kvmPort = login.KvmPort ?? throw new FormatException(LocalizationManager.Translate("登录响应缺少 KVM 端口。"));
+            SetLoadingStatus("正在协商 KVM 视频与输入通道");
+            var session = await KvmClientSession.ConnectAsync(
+                new KvmConnectionOptions(
+                    endpoint.Host,
+                    kvmPort,
+                    verificationKey.WireValue,
+                    Encrypted: login.KvmEncrypted,
+                    ExtendedVerifyValue: login.ExtendedVerifyValue,
+                    VerificationValue: login.VerifyValue,
+                    LoginDecryptionKey: login.DecryptionKey,
+                    VirtualMediaEncrypted: login.VirtualMediaEncrypted,
+                    Privilege: login.Privilege ?? throw new FormatException(LocalizationManager.Translate("登录响应缺少权限级别。"))),
+                cancellationToken);
+            return new ConnectedKvm(session, kvmPort);
+        }
+        catch (Exception exception) when (CanFallbackToRmcp(exception))
+        {
+            SetLoadingStatus("HTTPS 不可用，正在尝试 RMCP+ 旧固件登录");
+            var passwordCharacters = password.ToCharArray();
+            try
+            {
+                var legacy = await new RmcpOemLoginClient(new ManagedRmcpPlusTransport()).LoginAsync(
+                    endpoint.Host,
+                    endpoint.IpmiPort,
+                    userName,
+                    passwordCharacters,
+                    mode,
+                    cancellationToken);
+                SetLoadingStatus("正在协商旧固件 KVM 视频与输入通道");
+                var session = await KvmClientSession.ConnectAsync(
+                    new KvmConnectionOptions(
+                        endpoint.Host,
+                        legacy.KvmPort,
+                        legacy.CodeKey,
+                        Encrypted: legacy.KvmEncrypted,
+                        VerificationValue: legacy.CodeKey.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        LoginDecryptionKey: legacy.LoginDecryptionKey,
+                        VirtualMediaBladeNumber: 1,
+                        VirtualMediaEncrypted: legacy.VirtualMediaEncrypted,
+                        Privilege: legacy.Privilege,
+                        ProtocolProfile: legacy.Profile,
+                        KnownVirtualMediaPort: legacy.VirtualMediaPort),
+                    cancellationToken);
+                return new ConnectedKvm(session, legacy.KvmPort);
+            }
+            finally
+            {
+                passwordCharacters.AsSpan().Clear();
+            }
+        }
+    }
+
+    private static bool CanFallbackToRmcp(Exception exception) => exception is
+        HttpRequestException or
+        HttpIOException or
+        IOException or
+        AuthenticationException or
+        SocketException or
+        TimeoutException or
+        FormatException;
+
+    private sealed record ConnectedKvm(KvmClientSession Session, int Port);
+
+    private async Task<ResolvedCertificatePolicy> ResolveCertificatePolicyAsync(
         IbmcEndpoint endpoint,
         CancellationToken cancellationToken)
     {
+        var stored = certificateTrustStore.Resolve(endpoint);
+        if (stored.ServerFingerprint is not null)
+        {
+            SetLoadingStatus("正在核对已保存的服务器证书");
+            var current = await ServerCertificateProbe.ProbeAsync(endpoint, cancellationToken);
+            if (string.Equals(
+                    CertificateFingerprint.Normalize(stored.ServerFingerprint),
+                    CertificateFingerprint.Normalize(current.Sha256Fingerprint),
+                    StringComparison.Ordinal))
+            {
+                return new ResolvedCertificatePolicy(
+                    ServerCertificatePolicy.PinForSession,
+                    current.Sha256Fingerprint,
+                    stored.AuthorityCertificates);
+            }
+
+            return ConfirmCertificateDecision(endpoint, current, stored.AuthorityCertificates, cancellationToken);
+        }
+
         if (TrustCheckBox.IsChecked != true)
         {
-            return (ServerCertificatePolicy.Strict, null);
+            return new ResolvedCertificatePolicy(
+                ServerCertificatePolicy.Strict,
+                null,
+                stored.AuthorityCertificates);
         }
 
         SetLoadingStatus("正在读取服务器证书");
         var details = await ServerCertificateProbe.ProbeAsync(endpoint, cancellationToken);
-        var warning =
-            $"服务器证书不受系统信任，是否仅在本次会话中信任？\n\n" +
-            $"主题：{details.Subject}\n" +
-            $"颁发者：{details.Issuer}\n" +
-            $"有效期：{details.NotBefore:yyyy-MM-dd} 至 {details.NotAfter:yyyy-MM-dd}\n" +
-            $"验证状态：{FormatPolicyErrors(details.PolicyErrors)}\n\n" +
-            $"SHA-256：\n{FormatFingerprint(details.Sha256Fingerprint)}\n\n" +
-            "请通过可信渠道核对该指纹。";
-        var answer = MessageBox.Show(
-            this,
-            warning,
-            "确认 iBMC 服务器证书",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning,
-            MessageBoxResult.No);
-        if (answer != MessageBoxResult.Yes)
+        return ConfirmCertificateDecision(endpoint, details, stored.AuthorityCertificates, cancellationToken);
+    }
+
+    private ResolvedCertificatePolicy ConfirmCertificateDecision(
+        IbmcEndpoint endpoint,
+        ServerCertificateDetails details,
+        System.Collections.Immutable.ImmutableArray<byte[]> authorities,
+        CancellationToken cancellationToken)
+    {
+        var decisionWindow = new CertificateDecisionWindow(details) { Owner = this };
+        if (decisionWindow.ShowDialog() != true || decisionWindow.Decision == CertificateDecision.Cancel)
         {
-            throw new OperationCanceledException("用户未信任服务器证书。", cancellationToken);
+            throw new OperationCanceledException(LocalizationManager.Translate("用户未信任服务器证书。"), cancellationToken);
         }
 
-        return (ServerCertificatePolicy.PinForSession, details.Sha256Fingerprint);
+        if (decisionWindow.Decision == CertificateDecision.PersistServer)
+        {
+            certificateTrustStore.TrustServer(endpoint, details);
+        }
+
+        return new ResolvedCertificatePolicy(
+            ServerCertificatePolicy.PinForSession,
+            details.Sha256Fingerprint,
+            authorities);
+    }
+
+    private void TrustManagerButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var endpoint = IbmcEndpoint.Parse(AddressTextBox.Text.Trim());
+            new CertificateTrustWindow(certificateTrustStore, endpoint) { Owner = this }.ShowDialog();
+        }
+        catch (FormatException exception)
+        {
+            ApplyLoginState(LoginPhase.Failed, LocalizationManager.Translate(exception.Message));
+        }
+    }
+
+    private void HelpMenuButton_Click(object sender, RoutedEventArgs e)
+    {
+        var help = new HelpWindow { Owner = this };
+        help.Show();
     }
 
     private void ApplyLoginState(LoginPhase phase, string? detail = null)
@@ -138,10 +277,12 @@ public partial class LoginWindow : Window, IDisposable
         ConnectionForm.IsEnabled = presentation.IsFormEnabled;
         LoadingOverlay.Visibility = presentation.IsLoading ? Visibility.Visible : Visibility.Collapsed;
         LoginErrorBorder.Visibility = presentation.IsErrorVisible ? Visibility.Visible : Visibility.Collapsed;
-        LoginErrorText.Text = presentation.IsErrorVisible ? presentation.StatusText : string.Empty;
+        LoginErrorText.Text = presentation.IsErrorVisible
+            ? LocalizationManager.Translate(presentation.StatusText)
+            : string.Empty;
         if (presentation.IsLoading)
         {
-            LoadingStatusText.Text = presentation.StatusText;
+            LoadingStatusText.Text = LocalizationManager.Translate(presentation.StatusText);
         }
 
         if (phase == LoginPhase.Failed)
@@ -150,7 +291,7 @@ public partial class LoginWindow : Window, IDisposable
         }
     }
 
-    private void SetLoadingStatus(string status) => LoadingStatusText.Text = status;
+    private void SetLoadingStatus(string status) => LoadingStatusText.Text = LocalizationManager.Translate(status);
 
     private void LoadSavedConnectionSettings()
     {
@@ -205,14 +346,14 @@ public partial class LoginWindow : Window, IDisposable
         }
 
         RememberSettingsCheckBox.IsChecked = true;
-        ApplyLoginState(LoginPhase.Failed, "无法删除本地连接设置，请检查文件权限。");
+        ApplyLoginState(LoginPhase.Failed, LocalizationManager.Translate("无法删除本地连接设置，请检查文件权限。"));
     }
 
     private void ClearSavedSettingsButton_Click(object sender, RoutedEventArgs e)
     {
         if (!settingsStore.Delete())
         {
-            ApplyLoginState(LoginPhase.Failed, "无法删除本地连接设置，请检查文件权限。");
+            ApplyLoginState(LoginPhase.Failed, LocalizationManager.Translate("无法删除本地连接设置，请检查文件权限。"));
             return;
         }
 
@@ -245,17 +386,15 @@ public partial class LoginWindow : Window, IDisposable
 
     private static string GetLoginError(IbmcLoginResponse response) => response.Error switch
     {
-        LoginErrorCode.UserLocked => "iBMC 用户已锁定。",
-        LoginErrorCode.InsufficientPrivilege => "该用户没有远程控制权限。",
-        LoginErrorCode.PasswordExpired => "iBMC 密码已过期。",
-        LoginErrorCode.LoginRestricted => "iBMC 当前限制该登录方式。",
-        _ => $"iBMC 登录失败，错误码 {response.RawErrorCode}。",
+        LoginErrorCode.UserLocked => LocalizationManager.Translate("iBMC 用户已锁定。"),
+        LoginErrorCode.InsufficientPrivilege => LocalizationManager.Translate("该用户没有远程控制权限。"),
+        LoginErrorCode.PasswordExpired => LocalizationManager.Translate("iBMC 密码已过期。"),
+        LoginErrorCode.LoginRestricted => LocalizationManager.Translate("iBMC 当前限制该登录方式。"),
+        _ => LocalizationManager.Format("iBMC 登录失败，错误码 {0}。", response.RawErrorCode),
     };
 
-    private static string FormatFingerprint(string fingerprint) =>
-        string.Join(':', Enumerable.Range(0, fingerprint.Length / 2)
-            .Select(index => fingerprint.Substring(index * 2, 2)));
-
-    private static string FormatPolicyErrors(SslPolicyErrors errors) =>
-        errors == SslPolicyErrors.None ? "系统信任" : errors.ToString();
+    private sealed record ResolvedCertificatePolicy(
+        ServerCertificatePolicy Policy,
+        string? Fingerprint,
+        System.Collections.Immutable.ImmutableArray<byte[]> AuthorityCertificates);
 }

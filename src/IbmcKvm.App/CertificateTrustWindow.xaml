@@ -1,0 +1,54 @@
+<Window x:Class="IbmcKvm.App.CertificateTrustWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:ClassModifier="internal"
+        Title="证书信任管理" Width="920" Height="560" MinWidth="760" MinHeight="480"
+        Background="{StaticResource CanvasBrush}" WindowStartupLocation="CenterOwner">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="64" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="60" />
+        </Grid.RowDefinitions>
+        <Border Background="#18211E">
+            <Grid Margin="20,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="证书信任管理" Foreground="White" FontSize="17" FontWeight="SemiBold"
+                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,16,0" />
+                <TextBlock x:Name="ScopeText" Grid.Column="1" Foreground="#AAB6B0" FontSize="10"
+                           VerticalAlignment="Center" />
+            </Grid>
+        </Border>
+        <ListView x:Name="TrustList" Grid.Row="1" Margin="20,18" BorderBrush="{StaticResource LineBrush}"
+                  SelectionChanged="TrustList_SelectionChanged">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="类型" DisplayMemberBinding="{Binding KindLabel}" Width="100" />
+                    <GridViewColumn Header="范围" DisplayMemberBinding="{Binding Scope}" Width="155" />
+                    <GridViewColumn Header="主题" DisplayMemberBinding="{Binding Subject}" Width="235" />
+                    <GridViewColumn Header="有效期至" DisplayMemberBinding="{Binding ValidUntil}" Width="110" />
+                    <GridViewColumn Header="SHA-256" DisplayMemberBinding="{Binding Fingerprint}" Width="220" />
+                </GridView>
+            </ListView.View>
+        </ListView>
+        <Border Grid.Row="2" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0">
+            <Grid Margin="20,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="导入的 CA 仅用于当前主机和 HTTPS 端口，不修改 Windows 证书库。"
+                           Foreground="{StaticResource MutedBrush}" FontSize="10" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" Margin="0,0,16,0" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="RevokeButton" Content="撤销" Style="{StaticResource BaseButton}"
+                            IsEnabled="False" Margin="0,0,8,0" Click="RevokeButton_Click" />
+                    <Button Content="导入 CA" Style="{StaticResource PrimaryButton}" Click="ImportAuthorityButton_Click" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

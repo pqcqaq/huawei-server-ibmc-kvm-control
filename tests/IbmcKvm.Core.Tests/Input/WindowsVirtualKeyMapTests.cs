@@ -29,4 +29,37 @@ public sealed class WindowsVirtualKeyMapTests
         Assert.True(WindowsVirtualKeyMap.TryGetModifier(virtualKey, out var modifier));
         Assert.Equal(expected, modifier);
     }
+
+    [Theory]
+    [InlineData(0xDB, false, 0x30)]
+    [InlineData(0xDD, false, 0x31)]
+    [InlineData(0xDC, false, 0x89)]
+    [InlineData(0xDC, true, 0x87)]
+    [InlineData(0x1C, false, 0x8A)]
+    public void MapsJapaneseKeyboardSpecificKeys(int virtualKey, bool shifted, byte expected)
+    {
+        Assert.True(WindowsVirtualKeyMap.TryGetUsage(
+            virtualKey,
+            RemoteKeyboardLayout.Japanese,
+            shifted,
+            out var usage));
+        Assert.Equal(expected, usage);
+    }
+
+    [Theory]
+    [InlineData(0x41, 0x14)]
+    [InlineData(0x51, 0x04)]
+    [InlineData(0x5A, 0x1A)]
+    [InlineData(0x57, 0x1D)]
+    [InlineData(0x4D, 0x33)]
+    [InlineData(0xBC, 0x10)]
+    public void MapsFrenchAzertyPositions(int virtualKey, byte expected)
+    {
+        Assert.True(WindowsVirtualKeyMap.TryGetUsage(
+            virtualKey,
+            RemoteKeyboardLayout.French,
+            shifted: false,
+            out var usage));
+        Assert.Equal(expected, usage);
+    }
 }

@@ -12,12 +12,18 @@ public sealed record VirtualMediaSlotStatus(
 
 public sealed record VirtualMediaCapability(bool Available, int Port, KvmCipherSuite CipherSuite);
 
-public sealed class VirtualMediaController(KvmClientSession kvmSession) : IAsyncDisposable
+public sealed class VirtualMediaController : IAsyncDisposable
 {
     private readonly SemaphoreSlim gate = new(1, 1);
     private readonly Dictionary<MediaDeviceKind, IRandomAccessMedia> media = [];
     private VirtualMediaSession? session;
+    private KvmClientSession kvmSession;
     private int disposed;
+
+    public VirtualMediaController(KvmClientSession kvmSession)
+    {
+        this.kvmSession = kvmSession ?? throw new ArgumentNullException(nameof(kvmSession));
+    }
 
     public event EventHandler<VirtualMediaSlotStatus>? StatusChanged;
 
@@ -150,6 +156,59 @@ public sealed class VirtualMediaController(KvmClientSession kvmSession) : IAsync
             {
                 await session.MountAsync(mounted, cancellationToken).ConfigureAwait(false);
                 OnStatus(StatusFor(mounted, "已重新连接"));
+            }
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    public async Task ReplaceKvmSessionAsync(
+        KvmClientSession replacement,
+        bool restoreMountedMedia,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(replacement);
+        ThrowIfDisposed();
+        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (session is not null)
+            {
+                await session.DisposeAsync().ConfigureAwait(false);
+                session = null;
+            }
+
+            kvmSession = replacement;
+            if (!restoreMountedMedia || media.Count == 0)
+            {
+                return;
+            }
+
+            try
+            {
+                session = await ConnectSessionAsync(cancellationToken).ConfigureAwait(false);
+                foreach (var mounted in media.Values)
+                {
+                    await session.MountAsync(mounted, cancellationToken).ConfigureAwait(false);
+                    OnStatus(StatusFor(mounted, "已恢复连接"));
+                }
+            }
+            catch
+            {
+                if (session is not null)
+                {
+                    await session.DisposeAsync().ConfigureAwait(false);
+                    session = null;
+                }
+
+                foreach (var mounted in media.Values)
+                {
+                    OnStatus(StatusFor(mounted, "等待重新连接"));
+                }
+
+                throw;
             }
         }
         finally

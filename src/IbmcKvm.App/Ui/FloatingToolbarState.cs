@@ -1,24 +1,44 @@
 namespace IbmcKvm.App.Ui;
 
+internal enum FloatingToolbarTransition
+{
+    None,
+    Show,
+    Hide,
+}
+
 internal sealed class FloatingToolbarState(bool isPinned = true)
 {
     public bool IsPinned { get; private set; } = isPinned;
 
     public bool IsVisible { get; private set; } = true;
 
-    public void SetPinned(bool isPinned)
+    public FloatingToolbarTransition SetPinned(bool isPinned)
     {
         IsPinned = isPinned;
         IsVisible = true;
+        return FloatingToolbarTransition.None;
     }
 
-    public void Reveal() => IsVisible = true;
-
-    public void HideAfterPointerLeaves(bool isPointerOverToolbar)
+    public FloatingToolbarTransition Reveal()
     {
-        if (!IsPinned && !isPointerOverToolbar)
+        if (IsVisible)
         {
-            IsVisible = false;
+            return FloatingToolbarTransition.None;
         }
+
+        IsVisible = true;
+        return FloatingToolbarTransition.Show;
+    }
+
+    public FloatingToolbarTransition HideAfterPointerLeaves(bool isPointerOverToolbar)
+    {
+        if (IsPinned || isPointerOverToolbar || !IsVisible)
+        {
+            return FloatingToolbarTransition.None;
+        }
+
+        IsVisible = false;
+        return FloatingToolbarTransition.Hide;
     }
 }

@@ -60,7 +60,8 @@ public sealed class IbmcLoginClient(HttpClient httpClient, TimeSpan requestTimeo
 
     public static HttpClient CreateHttpClient(
         ServerCertificatePolicy certificatePolicy,
-        string? pinnedSha256Fingerprint = null)
+        string? pinnedSha256Fingerprint = null,
+        IReadOnlyCollection<byte[]>? customAuthorities = null)
     {
         var normalizedPin = pinnedSha256Fingerprint is null
             ? null
@@ -77,11 +78,19 @@ public sealed class IbmcLoginClient(HttpClient httpClient, TimeSpan requestTimeo
             PooledConnectionLifetime = TimeSpan.FromMinutes(2),
         };
 
-        if (certificatePolicy == ServerCertificatePolicy.PinForSession)
+        if (customAuthorities is { Count: > CertificateTrustValidator.MaximumCustomAuthorities })
         {
-            handler.SslOptions.RemoteCertificateValidationCallback = (_, certificate, _, errors) =>
+            throw new ArgumentOutOfRangeException(nameof(customAuthorities));
+        }
+
+        if (certificatePolicy == ServerCertificatePolicy.PinForSession || customAuthorities is { Count: > 0 })
+        {
+            var authorityCopies = customAuthorities?.Select(certificate => certificate.ToArray()).ToArray() ?? [];
+            handler.SslOptions.RemoteCertificateValidationCallback = (_, certificate, chain, errors) =>
                 errors == SslPolicyErrors.None ||
-                certificate is not null && CertificateFingerprint.Matches(certificate, normalizedPin!);
+                certificate is not null && normalizedPin is not null && CertificateFingerprint.Matches(certificate, normalizedPin) ||
+                certificate is not null && authorityCopies.Length > 0 &&
+                CertificateTrustValidator.IsTrustedByCustomAuthority(certificate, chain, errors, authorityCopies);
         }
 
         return new HttpClient(handler, disposeHandler: true)

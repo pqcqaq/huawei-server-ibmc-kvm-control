@@ -22,7 +22,19 @@
 20. [x] Correct modern iBMC keyboard encryption and mouse-mode negotiation, and add a four-color input readiness indicator.
 21. [x] Split login and KVM windows, add a loading/error handoff, and move controls into a pinnable auto-hide overlay toolbar.
 22. [x] Harden video-surface activation/focus before remote input and add executable UI state tests.
+23. [x] Animate floating-toolbar transitions and retain a visible top-edge reveal handle while hidden.
+24. [x] Implement the complete encrypted KVM session path, including encrypted video and KVM-side VMM negotiation; hardware verification remains a separate read-only gate.
+25. [x] Add older iBMC/iMana variant detection and managed RMCP+/OEM compatibility adapters; authorized legacy hardware verification remains pending.
+26. [x] Add bounded KVM reconnect, reconnect-token handling, and virtual-media restoration; desktop and authorized hardware failure injection remain pending.
+27. [x] Add relative/captured mouse modes, cursor synchronization, and local-pointer controls; desktop/high-DPI and hardware inspection remain pending.
+28. [x] Add local recording with original recording controls, `.rep` compatibility, and standard AVI export; Windows WPF MediaElement playback inspection passed.
+29. [x] Add source-compatible 14-slot chassis discovery, bounded four-session management, monitoring, selected-command routing, tabs, and read-only split-screen viewing; authorized multi-blade hardware validation remains pending.
+30. [x] Add DQT image-quality and selectable color-depth controls; authorized hardware and desktop/high-DPI verification remain pending.
+31. [x] Add the complete special-key set, custom combinations, keyboard layouts, and remote lock-state indicators; desktop/high-DPI and hardware inspection remain pending.
+32. [x] Expose forced power cycle and make KVM, power, and virtual-media controls privilege-aware; desktop/high-DPI and hardware inspection remain pending.
+33. [x] Add Chinese, English, Japanese, and French resources, maintained help, and an About view; 303 keys and 150% DPI four-language checks pass.
+34. [x] Add explicit persistent certificate trust import, inspection, review, and revocation; scoped DPAPI records reject changed certificates.
 
-Deferred compatibility extensions: recording and hardware injection tests for keyboard/mouse. Destructive virtual-media hardware operations are implemented but are not exercised while the target session is restricted to read-only verification.
+All scoped legacy-parity software capabilities are implemented and prioritized in `docs/legacy-feature-roadmap.md`; remaining entries are validation gates. Destructive virtual-media hardware operations are implemented but are not exercised while the target session is restricted to read-only verification.
 
 Detailed test-first steps are in `docs/plans/2026-07-14-ibmc-kvm-implementation.md` and `docs/plans/2026-07-14-ibmc-virtual-media-implementation.md`.

@@ -1,5 +1,12 @@
 namespace IbmcKvm.Core.Input;
 
+public enum RemoteKeyboardLayout
+{
+    UnitedStates,
+    Japanese,
+    French,
+}
+
 public static class WindowsVirtualKeyMap
 {
     public static bool TryGetModifier(int virtualKey, out HidModifiers modifier)
@@ -19,8 +26,25 @@ public static class WindowsVirtualKeyMap
         return modifier != HidModifiers.None;
     }
 
-    public static bool TryGetUsage(int virtualKey, out byte usage)
+    public static bool TryGetUsage(int virtualKey, out byte usage) =>
+        TryGetUsage(virtualKey, RemoteKeyboardLayout.UnitedStates, shifted: false, out usage);
+
+    public static bool TryGetUsage(
+        int virtualKey,
+        RemoteKeyboardLayout layout,
+        bool shifted,
+        out byte usage)
     {
+        if (!Enum.IsDefined(layout))
+        {
+            throw new ArgumentOutOfRangeException(nameof(layout));
+        }
+
+        if (TryGetLayoutUsage(virtualKey, layout, shifted, out usage))
+        {
+            return true;
+        }
+
         if (virtualKey is >= 0x41 and <= 0x5A)
         {
             usage = checked((byte)(0x04 + virtualKey - 0x41));
@@ -85,6 +109,42 @@ public static class WindowsVirtualKeyMap
             0x6B => 0x57,
             0x6E => 0x63,
             0x5D => 0x65,
+            _ => 0,
+        };
+        return usage != 0;
+    }
+
+    private static bool TryGetLayoutUsage(
+        int virtualKey,
+        RemoteKeyboardLayout layout,
+        bool shifted,
+        out byte usage)
+    {
+        usage = layout switch
+        {
+            RemoteKeyboardLayout.Japanese => virtualKey switch
+            {
+                0xDB => 0x30,
+                0xDD => 0x31,
+                0xDC => shifted ? (byte)0x87 : (byte)0x89,
+                0xF2 or 0xF3 => 0x35,
+                0x1C => 0x8A,
+                0x1D => 0x8B,
+                _ => 0,
+            },
+            RemoteKeyboardLayout.French => virtualKey switch
+            {
+                0x41 => 0x14,
+                0x51 => 0x04,
+                0x5A => 0x1A,
+                0x57 => 0x1D,
+                0x4D => 0x33,
+                0xBC => 0x10,
+                0xBA => 0x36,
+                0xBE => 0x37,
+                0xBF => 0x38,
+                _ => 0,
+            },
             _ => 0,
         };
         return usage != 0;

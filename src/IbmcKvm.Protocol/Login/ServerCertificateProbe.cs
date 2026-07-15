@@ -11,7 +11,8 @@ public sealed record ServerCertificateDetails(
     DateTime NotBefore,
     DateTime NotAfter,
     string Sha256Fingerprint,
-    SslPolicyErrors PolicyErrors);
+    SslPolicyErrors PolicyErrors,
+    ReadOnlyMemory<byte> CertificateDer);
 
 public static class ServerCertificateProbe
 {
@@ -59,7 +60,8 @@ public static class ServerCertificateProbe
                 captured.NotBefore,
                 captured.NotAfter,
                 CertificateFingerprint.GetSha256(captured),
-                policyErrors);
+                policyErrors,
+                captured.Export(X509ContentType.Cert));
         }
     }
 }

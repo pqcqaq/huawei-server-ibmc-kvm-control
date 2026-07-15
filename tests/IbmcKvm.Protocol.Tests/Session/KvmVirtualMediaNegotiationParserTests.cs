@@ -44,6 +44,16 @@ public sealed class KvmVirtualMediaNegotiationParserTests
     }
 
     [Theory]
+    [InlineData(0, KvmPrivilegeDenial.None)]
+    [InlineData(1, KvmPrivilegeDenial.Power)]
+    [InlineData(2, KvmPrivilegeDenial.VirtualMedia)]
+    [InlineData(3, KvmPrivilegeDenial.VirtualMedia)]
+    public void IdentifiesOperationSpecificPrivilegeDenials(byte state, KvmPrivilegeDenial expected)
+    {
+        Assert.Equal(expected, KvmVirtualMediaNegotiationParser.GetPrivilegeDenial(state));
+    }
+
+    [Theory]
     [InlineData("32")]
     [InlineData("3200")]
     [InlineData("32000000000000000000000000000000000000000000000000000000000000000000000000")]
