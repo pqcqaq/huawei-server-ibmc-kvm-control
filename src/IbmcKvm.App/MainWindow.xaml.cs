@@ -1736,7 +1736,7 @@ public partial class MainWindow : Window, IDisposable
         var dialog = new SaveFileDialog
         {
             Filter = LocalizationManager.Translate(
-                "原厂录像 (*.rep)|*.rep|Motion JPEG AVI (*.avi)|*.avi|所有文件 (*.*)|*.*"),
+                ".rep 录像 (*.rep)|*.rep|Motion JPEG AVI (*.avi)|*.avi|所有文件 (*.*)|*.*"),
             DefaultExt = ".rep",
             AddExtension = true,
             FileName = $"ibmc-{DateTime.Now:yyyyMMdd-HHmmss}.rep",

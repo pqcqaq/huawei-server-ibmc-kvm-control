@@ -14,7 +14,7 @@
             <StackPanel Margin="28,22">
                 <TextBlock Text="iBMC KVM" Foreground="White" FontFamily="Bahnschrift SemiBold" FontSize="26" />
                 <TextBlock x:Name="VersionText" Foreground="#9FADA6" FontSize="11" Margin="0,6,0,0" />
-                <TextBlock Text="Windows x64 clean-room remote console" Foreground="#C4CEC9" FontSize="10" Margin="0,8,0,0" />
+                <TextBlock Text="Windows x64 remote console client" Foreground="#C4CEC9" FontSize="10" Margin="0,8,0,0" />
             </StackPanel>
         </Border>
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">

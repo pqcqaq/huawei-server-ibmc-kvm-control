@@ -45,9 +45,9 @@ public sealed class CertificateTrustStoreTests : IDisposable
     {
         var store = new CertificateTrustStore(filePath);
         var endpoint = new IbmcEndpoint("ibmc.example.test", 443);
-        using var original = CreateCertificate(false, "CN=ibmc.example.test");
+        using var previous = CreateCertificate(false, "CN=ibmc.example.test");
         using var replacement = CreateCertificate(false, "CN=ibmc.example.test");
-        store.TrustServer(endpoint, Details(original));
+        store.TrustServer(endpoint, Details(previous));
 
         var record = Assert.Single(store.Load());
 

@@ -39,7 +39,7 @@ public sealed class KvmCommandBuilderTests
     [InlineData(0)]
     [InlineData(15)]
     [InlineData(255)]
-    public void RejectsBladeNumbersOutsideOriginalChassisRange(byte bladeNumber)
+    public void RejectsBladeNumbersOutsideProtocolChassisRange(byte bladeNumber)
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => KvmCommandBuilder.RequestBladeState(bladeNumber, false));
     }

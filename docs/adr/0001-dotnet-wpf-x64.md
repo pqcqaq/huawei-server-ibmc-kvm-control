@@ -1,4 +1,4 @@
-# ADR-0001: Use .NET 9 WPF and a window-local input model
+# ADR-0001: Use .NET 9 WPF and window-local input
 
 ## Status
 
@@ -6,30 +6,34 @@ Accepted
 
 ## Context
 
-The legacy client is a 32-bit Java 8 application. It installs a desktop-wide `WH_KEYBOARD` hook from a Swing event thread. On 64-bit Windows, stalled message pumping can block unrelated 64-bit applications. The replacement is Windows-only and needs low-latency rendering, input, cancellation, and maintainable protocol code.
+iBMC KVM is a Windows desktop application that needs low-latency video
+presentation, focused keyboard and mouse input, cancellable network operations,
+and testable protocol code.
 
 ## Decision
 
-Use .NET 9 WPF targeting `win-x64`. Capture keyboard and mouse events only when the viewer control has focus. Put login, TCP I/O, packet parsing, decoding, and recording on asynchronous workers behind bounded channels. Keep protocol code independent from WPF.
+Use .NET 9 WPF targeting `win-x64`. Capture keyboard and mouse events only while
+the remote viewer has focus. Run login, TCP I/O, packet parsing, decoding, and
+recording asynchronously behind bounded queues. Keep protocol code independent
+from WPF.
 
 ## Consequences
 
 ### Positive
 
-- Native Windows x64 process with no cross-bitness hook callback path.
-- Mature desktop input, imaging, cancellation, and diagnostics APIs.
-- Protocol and decoder logic can be tested without the UI.
-- Self-contained publishing is available.
+- The application does not install system-wide keyboard or mouse hooks.
+- Protocol and decoder logic can be tested without opening the desktop UI.
+- Windows input, imaging, cancellation, and diagnostics APIs are available.
+- Self-contained Windows x64 publishing is supported.
 
 ### Negative
 
-- First release is Windows-only.
-- Special operating-system key combinations require explicit UI commands rather than interception.
-- Legacy video and virtual-media formats still require protocol porting.
+- The desktop application is Windows-only.
+- Operating-system key combinations require explicit toolbar commands.
 
 ## Alternatives considered
 
-- Rust with egui/Tauri: excellent systems safety, but higher UI and imaging integration cost for this recovery project.
-- Modern Java/JavaFX: fastest mechanical port, but retains runtime/native baggage and makes it easier to reproduce the old threading design.
-- Reuse the legacy DLL hook: rejected because it is the proven cross-process failure mechanism.
-
+- Rust with egui or Tauri: strong systems tooling, but higher UI and imaging
+  integration cost for this application.
+- JavaFX: portable, but less direct integration with Windows input, DPAPI, and
+  physical-drive APIs.

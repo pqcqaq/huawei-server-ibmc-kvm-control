@@ -161,7 +161,7 @@ internal sealed class DesktopSmokeRunner(Application application, string outputD
             Check(
                 server.Commands.Count(static payload =>
                     payload.SequenceEqual(new byte[] { 0x05, 1, 0, 0x81, 0x81, 0 })) >= 15,
-                "Relative synchronization sends fifteen source-compatible reports.");
+                "Relative synchronization sends fifteen protocol reports.");
 
             var qualityItems = EnumerateMenuItems(videoQuality.ContextMenu).ToArray();
             var quality60 = qualityItems.Single(item => Equals(item.Tag, "60"));

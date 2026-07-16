@@ -15,7 +15,7 @@ public sealed class JpegHeaderFactoryTests
     [InlineData(7, "F75407BB3A65FA4E75C7CE029889BD97124465C2F0555075D7DE52E7B64B7642")]
     [InlineData(8, "7AD5BDFBCD88CC3F9DF9EB77A65A354294EFC0493E91FD90BBC6BAD772B2B79D")]
     [InlineData(9, "F549FDDE39FCFC305079BEC177D898A5F7C160A6959F558FE2D7479B3220BCD4")]
-    public void MatchesLegacyJarOracle(int tableIndex, string expectedSha256)
+    public void MatchesKnownJpegHeaderVector(int tableIndex, string expectedSha256)
     {
         var header = JpegHeaderFactory.Create(tableIndex);
 

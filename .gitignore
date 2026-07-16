@@ -4,6 +4,7 @@ obj/
 .idea/
 TestResults/
 artifacts/
+.artifacts/
 publish/
 *.user
 *.suo
@@ -11,4 +12,14 @@ publish/
 *.snk
 appsettings.local.json
 credentials.json
+.env
+.env.*
+!.env.example
+*.key
+configuration/mysql.json
 
+# Local development notes
+progress.md
+task_plan.md
+docs/plans/
+docs/legacy-feature-roadmap.md

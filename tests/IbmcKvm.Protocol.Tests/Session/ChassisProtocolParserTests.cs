@@ -6,7 +6,7 @@ namespace IbmcKvm.Protocol.Tests.Session;
 public sealed class ChassisProtocolParserTests
 {
     [Fact]
-    public void MapsOriginalFourteenSlotPresenceBitmapAndIgnoresReservedBits()
+    public void MapsFourteenSlotPresenceBitmapAndIgnoresReservedBits()
     {
         var presence = ChassisProtocolParser.ParsePresence([0x01, 0xC1, 0x83]);
 
@@ -56,7 +56,7 @@ public sealed class ChassisProtocolParserTests
     }
 
     [Fact]
-    public void ParsesBusyClientAndOriginalFourSessionLimit()
+    public void ParsesBusyClientAndFourSessionLimit()
     {
         var user = "operator"u8.ToArray();
         var busyPayload = new byte[24];

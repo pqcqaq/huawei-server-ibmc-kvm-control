@@ -33,7 +33,7 @@ public sealed class UfiFloppyProcessorTests
     }
 
     [Fact]
-    public async Task ReadsAndWritesAllOriginalTransferVariants()
+    public async Task ReadsAndWritesAllSupportedTransferVariants()
     {
         var media = new ScsiTestMedia(MediaDeviceKind.Floppy, 512, 64);
         var processor = new UfiFloppyProcessor(media);
@@ -58,7 +58,7 @@ public sealed class UfiFloppyProcessorTests
     }
 
     [Fact]
-    public async Task ImplementsModeFormatAndSimpleOriginalCommands()
+    public async Task ImplementsModeFormatAndSimpleProtocolCommands()
     {
         var media = new ScsiTestMedia(MediaDeviceKind.Floppy, 512, 32);
         var processor = new UfiFloppyProcessor(media);

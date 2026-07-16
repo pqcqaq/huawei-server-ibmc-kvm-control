@@ -91,7 +91,7 @@ public sealed class ChassisConsoleCoordinator<TSession> : IAsyncDisposable
                 if (slots.Count >= MaximumSessions)
                 {
                     throw new InvalidOperationException(
-                        $"The original chassis supports at most {MaximumSessions} simultaneous KVM sessions.");
+                        $"The console supports at most {MaximumSessions} simultaneous KVM sessions.");
                 }
             }
 

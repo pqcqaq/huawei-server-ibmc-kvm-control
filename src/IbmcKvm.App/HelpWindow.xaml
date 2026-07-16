@@ -47,7 +47,7 @@
                     <StackPanel Margin="24,20">
                         <TextBlock Text="本地录像" FontSize="18" FontWeight="SemiBold" />
                         <TextBlock TextWrapping="Wrap" Margin="0,12,0,0" LineHeight="22"
-                                   Text="录像按钮可保存原厂兼容的 .rep 文件，或导出标准 Motion JPEG AVI。AVI 必须在收到第一帧后开始。写盘与 JPEG 编码使用有界后台队列，不阻塞视频接收；磁盘错误和丢帧数会显示在控制台状态栏。切换刀片前当前录像会安全停止。" />
+                                   Text="录像按钮可保存 .rep 格式录像，或导出标准 Motion JPEG AVI。AVI 必须在收到第一帧后开始。写盘与 JPEG 编码使用有界后台队列，不阻塞视频接收；磁盘错误和丢帧数会显示在控制台状态栏。切换刀片前当前录像会安全停止。" />
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

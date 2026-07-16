@@ -55,9 +55,8 @@ public static class ChassisProtocolParser
         }
 
         var blades = ImmutableArray.CreateBuilder<byte>(MaximumBladeCount);
-        // The original client reverses the two response bytes, then skips the
-        // outer reserved bit on each side: response byte 2 bits 1..7 are
-        // blades 1..7 and response byte 1 bits 0..6 are blades 8..14.
+        // Response byte 2 bits 1..7 map to blades 1..7; response byte 1
+        // bits 0..6 map to blades 8..14. The outer bits are reserved.
         for (byte blade = 1; blade <= 7; blade++)
         {
             if ((payload[2] & (1 << blade)) != 0)

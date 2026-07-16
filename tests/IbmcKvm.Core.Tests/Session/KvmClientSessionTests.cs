@@ -181,7 +181,7 @@ public sealed class KvmClientSessionTests
     }
 
     [Fact]
-    public async Task SynchronizesAbsoluteMouseWithOriginalSentinelCoordinates()
+    public async Task SynchronizesAbsoluteMouseWithProtocolSentinelCoordinates()
     {
         var listener = StartListener();
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -731,7 +731,7 @@ public sealed class KvmClientSessionTests
                 requestedMouseMode: KvmMouseMode.Relative),
             timeout.Token);
 
-        await using var original = await KvmClientSession.ConnectAsync(
+        await using var previous = await KvmClientSession.ConnectAsync(
             new KvmConnectionOptions(
                 "127.0.0.1",
                 port,
@@ -767,7 +767,7 @@ public sealed class KvmClientSessionTests
             await stream.WriteAsync(BuildIncoming(0x25, 1, 0), cancellationToken);
         }, timeout.Token);
 
-        await using var reconnected = await original.ReconnectAsync(token, timeout.Token);
+        await using var reconnected = await previous.ReconnectAsync(token, timeout.Token);
 
         Assert.Equal(2, reconnected.CurrentColorDepth);
         Assert.Equal(KvmMouseMode.Relative, reconnected.CurrentMouseMode);
@@ -962,7 +962,7 @@ public sealed class KvmClientSessionTests
     }
 
     [Fact]
-    public async Task MonitorHandshakeUsesOriginalCommandsAndRemainsReadOnly()
+    public async Task MonitorHandshakeUsesProtocolCommandsAndRemainsReadOnly()
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var listener = StartListener();

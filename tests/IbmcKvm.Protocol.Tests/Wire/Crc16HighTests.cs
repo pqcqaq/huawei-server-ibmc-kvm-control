@@ -10,7 +10,7 @@ public sealed class Crc16HighTests
     [InlineData("1401", 0xDF96)]
     [InlineData("01020304", 0x0D03)]
     [InlineData("313233343536373839", 0x31C3)]
-    public void MatchesLegacyJarOracle(string hexadecimal, ushort expected)
+    public void MatchesKnownChecksumVector(string hexadecimal, ushort expected)
     {
         Assert.Equal(expected, Crc16High.Compute(Convert.FromHexString(hexadecimal)));
     }

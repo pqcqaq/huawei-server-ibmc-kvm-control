@@ -7,7 +7,7 @@ namespace IbmcKvm.Core.Tests.Recording;
 public sealed class RepRecordingWriterTests
 {
     [Fact]
-    public async Task WritesHeaderIndexAndFrameUsingOriginalRepLayout()
+    public async Task WritesHeaderIndexAndFrameUsingProtocolRepLayout()
     {
         await using var stream = new MemoryStream();
         await using (var writer = new RepRecordingWriter(stream, leaveOpen: true))

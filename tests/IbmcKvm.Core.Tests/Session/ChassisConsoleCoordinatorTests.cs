@@ -6,7 +6,7 @@ namespace IbmcKvm.Core.Tests.Session;
 public sealed class ChassisConsoleCoordinatorTests
 {
     [Fact]
-    public async Task BoundsSessionsAtOriginalFourConnectionLimit()
+    public async Task BoundsSessionsAtFourConnectionLimit()
     {
         var primary = new FakeSession(1);
         await using var coordinator = CreateCoordinator(primary);
@@ -78,16 +78,16 @@ public sealed class ChassisConsoleCoordinatorTests
     [Fact]
     public async Task ReconnectReplacementChangesOwnershipWithoutDisposingEitherSession()
     {
-        var original = new FakeSession(1);
+        var previous = new FakeSession(1);
         var replacement = new FakeSession(1);
-        var coordinator = CreateCoordinator(original);
+        var coordinator = CreateCoordinator(previous);
 
-        coordinator.ReplaceSession(1, original, replacement);
+        coordinator.ReplaceSession(1, previous, replacement);
 
         Assert.Same(replacement, coordinator.SelectedSession?.Session);
-        Assert.Equal(0, original.DisposeCount);
+        Assert.Equal(0, previous.DisposeCount);
         await coordinator.DisposeAsync();
-        Assert.Equal(0, original.DisposeCount);
+        Assert.Equal(0, previous.DisposeCount);
         Assert.Equal(1, replacement.DisposeCount);
     }
 

@@ -34,7 +34,7 @@ public static class RmcpOemCommandCodec
         ArgumentException.ThrowIfNullOrWhiteSpace(userName);
         if (codeKey is < 0 or > 9)
         {
-            throw new ArgumentOutOfRangeException(nameof(codeKey), "The original client uses a one-digit session key.");
+            throw new ArgumentOutOfRangeException(nameof(codeKey), "The RMCP+ session key must be in the 0..9 range.");
         }
 
         if (!userName.All(static character => character is > '\0' and <= '\x7F'))

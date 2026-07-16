@@ -13,7 +13,7 @@ public sealed class ChassisUiStateTests
     [InlineData(ChassisBladeStatus.SolActive, "SOL 使用中")]
     [InlineData(ChassisBladeStatus.FirmwareLoading, "固件加载中")]
     [InlineData(ChassisBladeStatus.KvmUnsupported, "不支持 KVM")]
-    public void SurfacesOriginalBladeStates(ChassisBladeStatus status, string expected)
+    public void SurfacesSupportedBladeStates(ChassisBladeStatus status, string expected)
     {
         var item = ChassisUiState.Resolve(State(status), []);
 

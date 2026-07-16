@@ -23,7 +23,7 @@ public sealed class ImanaSessionMaterialTests
     }
 
     [Fact]
-    public void MatchesOriginalV1InputAndVideoTransforms()
+    public void MatchesKnownV1InputAndVideoTransforms()
     {
         using var cryptography = ImanaSessionCryptography.FromCodeKey(7);
 

@@ -15,7 +15,7 @@ public sealed class KvmSessionCryptographyTests
     [Theory]
     [InlineData(2, 5000, "5678FDE91A8CBEC25BD92C9D5071C0D843721DBC9C843D57")]
     [InlineData(3, 10000, "0C829FAA0BD699D5A2A413E9BCA114061BE027FD07682FDC")]
-    public void DerivesWordReversedConnectAuthenticatorMatchingOriginalJar(
+    public void DerivesWordReversedConnectAuthenticatorMatchingKnownVector(
         byte algorithm,
         int iterations,
         string expectedHex)
@@ -30,7 +30,7 @@ public sealed class KvmSessionCryptographyTests
     }
 
     [Fact]
-    public void EstablishesSessionAndMatchesOriginalJarTransforms()
+    public void EstablishesSessionAndMatchesKnownTransforms()
     {
         using var cryptography = KvmSessionCryptography.FromLoginKey(LoginKeyHex);
         cryptography.EstablishSession(

@@ -1,68 +1,145 @@
 # iBMC KVM
 
-A clean-room Windows x64 client for Huawei iBMC remote console access.
+iBMC KVM 是一个面向 Windows x64 的 Huawei iBMC 远程控制台客户端，使用
+.NET 9 和 WPF 构建。项目提供 KVM 视频、键盘鼠标、虚拟媒体、机箱刀片管理、
+录像和断线恢复等常用运维能力。
 
-The application is rebuilt from observed behavior and protocol analysis. It does not reuse the legacy Java runtime or its global keyboard hook. Capability-oriented profiles cover current iBMC, legacy iBMC, and iMana protocol families.
+> 电源控制、虚拟媒体写入和 USB 重置会改变服务器状态。执行前请确认当前目标、
+> 账户权限和业务影响。
 
-## Safety invariants
+## 功能
 
-- No system-wide keyboard or mouse hooks.
-- No network I/O, decoding, or blocking waits on the WPF UI thread.
-- Passwords and session keys are never written to logs or project configuration.
-- Remembered connection settings are opt-in and encrypted with Windows DPAPI for the current user.
-- Every connection can be cancelled and has bounded timeouts.
-- Self-signed iBMC certificates require an explicit per-connection trust decision.
-- The desktop smoke verifier is hard-coded to a loopback listener and rejects any observed power or USB-reset command; it never connects to target hardware.
+### 远程控制台
 
-See `task_plan.md` and `progress.md` for the implementation and verification
-state. Source-verified parity, remaining hardware gates, and the evidence for
-each capability are tracked in `docs/legacy-feature-roadmap.md`.
+- 解析 64x64 JPEG/RLE 视频块、差分帧和分辨率变化。
+- 支持 8/7/6/4 位颜色深度和运行时图像清晰度调整。
+- 支持绝对、相对和捕获鼠标模式，以及本地指针显示和鼠标同步。
+- 使用有序 USB HID 键盘报告，支持快速输入、长按、修饰键、锁定键状态灯、
+  组合键、自定义六键组合和键盘复位。
+- 提供美国、日语和法语键盘布局。
+- 支持截图、全屏显示、`.rep` 录像和 Motion JPEG AVI 导出。
 
-## Implemented console functions
+### 会话与安全
 
-- Two-window flow: a focused login window with connection loading/error states hands the session to a video-only KVM window.
-- Full-area video with an overlaid toolbar. The left pin button keeps the toolbar visible or enables delayed auto-hide; disconnect is always on the right.
-- HTTPS login with explicit per-session certificate fingerprint confirmation.
-- Shared or exclusive KVM sessions with negotiated cipher-suite selection.
-- Huawei 64×64 JPEG/RLE video blocks, differential frames, and resolution changes.
-- Window-local USB HID keyboard input with ordered key pulses for fast typing, held-key repeat, modifiers, lock keys, and special combinations; lock indicators use bounded state re-queries to tolerate delayed firmware updates; plus absolute, relative, and captured mouse modes with explicit pointer visibility and synchronization.
-- Modern iBMC input compatibility: code-key AES keyboard reports and confirmed absolute mouse mode.
-- Four-color input indicator in the lower-left status bar: gray disconnected, red failed, blue connected/inactive, green ready.
-- Source-compatible key presets, a six-key custom editor, US/Japanese/French layouts, remote lock LEDs refreshed after Caps/Num/Scroll toggles, screenshots, and full-screen viewing.
-- Privilege-aware power controls, including distinct forced reset and forced power-cycle confirmations. Hardware verification never invokes them without authorization.
-- Bounded automatic KVM reconnect with post-recovery virtual-media restoration and actionable progress.
-- Local `.rep` recording and standard Motion JPEG AVI export through bounded background queues.
-- Runtime DQT clarity and 8/7/6/4-bit color-depth controls.
-- Source-compatible 14-slot chassis refresh, per-blade control or read-only monitoring, at most four simultaneous sessions, selected-blade command routing, tabs, and a read-only 2x2 split view.
-- Optional restoration of the last successful connection, including credentials and connection options.
-- Chinese, English, Japanese, and French UI resources with maintained help and About/protocol compatibility views.
-- Explicit certificate trust management with scoped server fingerprints or CA imports, inspection, revocation, and strict changed-certificate handling.
+- 支持共享控制、独占控制和只读监视会话。
+- 支持 HTTPS、RMCP+/OEM、加密 KVM、iMana 会话和运行时能力协商。
+- 提供有界的自动重连，并在 KVM 恢复后恢复已挂载的虚拟媒体。
+- 自签名证书必须经过指纹确认；服务器证书和 CA 信任可以检查和撤销。
+- 可选择记住连接。凭据仅以当前 Windows 用户可解密的 DPAPI 数据保存。
+- 不安装系统级键盘或鼠标钩子，网络、解码和文件任务不阻塞 WPF 界面线程。
 
-## Implemented virtual-media functions
+### 虚拟媒体与机箱
 
-- Floppy images and physical floppy drives, with write protection enabled by default.
-- ISO images, physical optical drives, and local directories mapped as temporary Joliet images.
-- Independent simultaneous floppy and optical slots with mount/change, eject, and reconnect.
-- Physical-media enumeration, readiness status, cancellable image creation, and progress reporting.
-- UFI/SFF-8020i command processing, media-change sense data, bounded reads/writes, and VMM heartbeat handling.
-- Login-selected plain or AES-CBC media data and PBKDF2-HMAC-SHA1/SHA256 authentication.
-- Explicitly confirmed USB virtual-device reset. It is never sent during capability checks.
+- 软驱支持镜像和物理驱动器，默认启用写保护。
+- 光驱支持 ISO、物理驱动器和本地目录；目录会生成临时 Joliet ISO。
+- 软驱和光驱可以同时挂载，并支持更换、弹出和重连恢复。
+- 支持 UFI 和 SFF-8020i 命令、介质变更状态及可选 AES-CBC 数据保护。
+- 支持最多 14 个机箱槽位、四路并发会话、刀片标签页和只读 2x2 分屏。
+- 电源操作和 USB 重置都需要显式确认，并受当前账户权限约束。
 
-## Run
+## 兼容性
+
+项目包含多种 iBMC 和 iMana 协议配置，具体功能由登录协商、固件能力和账户权限
+共同决定。不同服务器型号和固件版本可能只支持上述功能的一部分。
+
+提交兼容性问题时，请提供服务器型号、固件版本、连接方式、可复现步骤和脱敏后的
+错误信息。不要附带密码、会话密钥、证书私钥或可访问的管理地址。
+
+## 环境要求
+
+- Windows 10 或 Windows 11 x64
+- .NET 9 SDK
+- 可访问的 iBMC 管理地址
+- 具备所需 KVM、虚拟媒体或电源权限的账户
+
+## 构建与运行
+
+还原依赖并构建整个解决方案：
+
+```powershell
+dotnet restore IbmcKvm.slnx
+dotnet build IbmcKvm.slnx --configuration Release
+```
+
+从源码运行桌面客户端：
 
 ```powershell
 dotnet run --project src/IbmcKvm.App/IbmcKvm.App.csproj --configuration Release
 ```
 
-The built executable is under `src/IbmcKvm.App/bin/Release/net9.0-windows/win-x64/`.
-Credentials are not saved by default. When **记住此连接** is selected, a successful connection stores a versioned DPAPI-encrypted file at `%LOCALAPPDATA%\IbmcKvm\connection-settings.bin`. Only the same Windows user can decrypt it. Unchecking the option or selecting **清除已保存设置** removes the file.
+生成自包含的 Windows x64 发布目录：
 
-Open **虚拟媒体** from the connected console toolbar. Optical and directory sources are always read-only. Closing the virtual-media window leaves current mounts active; disconnecting the KVM session closes VMM and deletes generated directory images.
+```powershell
+dotnet publish src/IbmcKvm.App/IbmcKvm.App.csproj `
+  --configuration Release `
+  --runtime win-x64 `
+  --self-contained true
+```
 
-Move the pointer over the actual remote image to activate input. The lower-left indicator turns green only when the window, viewer focus, video frame, and pointer position all allow keyboard and mouse events to be sent. The client explicitly activates and focuses the video surface when the pointer enters or the window becomes active. Moving outside the remote image releases held remote keys/buttons and changes the indicator to blue. The top toolbar uses a single row of icon controls; mouse mode, image clarity, and color depth open checked menus and expose the current value in their tooltips. The toolbar can be pinned or left to auto-hide; when hidden, its centered top handle remains visible and reveals the animated toolbar when the pointer moves over it.
+默认构建产物位于
+`src/IbmcKvm.App/bin/Release/net9.0-windows/win-x64/`。
 
-For the optional interactive desktop verification, build the solution and run
-`tests/IbmcKvm.DesktopSmoke/bin/Release/net9.0-windows/win-x64/IbmcKvm.DesktopSmoke.exe`.
-It opens local WPF windows, moves the pointer for captured-mouse checks, connects
-only to `127.0.0.1`, and writes screenshots/report data under
-`.artifacts/desktop-smoke`. It lists power-menu entries but never invokes them.
+## 使用说明
+
+1. 在登录窗口输入 iBMC 主机名、IP 地址或 HTTPS 地址及账户凭据。
+2. 选择共享控制或独占控制。遇到自签名证书时，先核对主题、颁发者、有效期和
+   SHA-256 指纹。
+3. 连接后将鼠标移入远端画面并使画面获得焦点。左下角输入状态变为绿色后，键盘
+   和鼠标输入才会发送。
+4. 使用顶部工具栏调整鼠标模式、清晰度、颜色深度、键盘、录像、虚拟媒体和电源。
+5. 移出画面、窗口失焦或切换刀片时，客户端会释放远端按键和鼠标按钮。
+
+保存连接不是默认行为。启用“记住此连接”后，配置写入
+`%LOCALAPPDATA%\IbmcKvm\connection-settings.bin`，并由 Windows DPAPI
+按当前用户加密。取消该选项或使用“清除已保存设置”会删除文件。
+
+关闭虚拟媒体窗口不会自动弹出介质；断开 KVM 会话会关闭虚拟媒体连接并清理临时
+目录镜像。
+
+## 项目结构
+
+```text
+src/
+  IbmcKvm.Protocol/   登录、协议帧、密码学和传输
+  IbmcKvm.Core/       会话、视频、输入、录像和虚拟媒体
+  IbmcKvm.App/        WPF 桌面界面
+tests/
+  IbmcKvm.Protocol.Tests/
+  IbmcKvm.Core.Tests/
+  IbmcKvm.App.Tests/
+  IbmcKvm.DesktopSmoke/
+docs/
+  adr/                已采用的架构决策
+```
+
+## 测试
+
+运行自动化测试：
+
+```powershell
+dotnet test IbmcKvm.slnx --configuration Release
+```
+
+桌面冒烟测试会打开本地 WPF 窗口并生成截图：
+
+```powershell
+dotnet build tests/IbmcKvm.DesktopSmoke/IbmcKvm.DesktopSmoke.csproj `
+  --configuration Release
+./tests/IbmcKvm.DesktopSmoke/bin/Release/net9.0-windows/win-x64/IbmcKvm.DesktopSmoke.exe
+```
+
+该测试只连接 `127.0.0.1` 的环回服务，并拒绝测试过程中出现的电源或 USB
+重置命令。截图和报告写入 `.artifacts/desktop-smoke/`。
+
+## 参与贡献
+
+- 修改前先创建独立分支，并保持改动范围明确。
+- 协议、输入、密码学和虚拟媒体行为变更需要相应的自动化测试。
+- 提交前运行 Release 构建和相关测试。
+- Issue、日志、测试夹具和截图必须脱敏。
+- 不要提交真实凭据、密钥、令牌、私钥、管理地址或生产环境配置。
+
+## 许可证
+
+本仓库目前未包含许可证文件。公开发布或接受外部贡献前，请先添加明确的开源
+许可证。

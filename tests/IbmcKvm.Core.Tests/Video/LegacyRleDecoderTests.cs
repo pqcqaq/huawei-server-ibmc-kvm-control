@@ -9,7 +9,7 @@ public sealed class LegacyRleDecoderTests
     [InlineData(5, 4, "007F0140", "7F7F7F7F7F7F7F7F7F7F7F7F7F7F7F7F7F7F7F7F")]
     [InlineData(20, 15, "0022052C", null)]
     [InlineData(4, 2, "00E031F5", "E0E0E01F1F1F1F1F")]
-    public void MatchesLegacyJarOracle(int width, int height, string encodedHex, string? expectedHex)
+    public void MatchesKnownRleVector(int width, int height, string encodedHex, string? expectedHex)
     {
         var result = LegacyRleDecoder.Decode(Convert.FromHexString(encodedHex), width, height);
 

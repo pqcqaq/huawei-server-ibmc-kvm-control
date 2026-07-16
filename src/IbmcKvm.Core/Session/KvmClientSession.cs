@@ -277,7 +277,7 @@ public sealed class KvmClientSession : IAsyncDisposable
         if (options.SessionMode == KvmBladeSessionMode.Monitor && options.Encrypted)
         {
             throw new NotSupportedException(
-                "The original monitor command uses a code-key packet and does not negotiate encrypted KVM payloads.");
+                "Monitor sessions do not negotiate encrypted KVM payloads.");
         }
 
         IKvmPayloadCryptography? cryptography = options.Encrypted

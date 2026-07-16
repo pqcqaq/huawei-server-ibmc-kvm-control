@@ -39,7 +39,7 @@ public sealed class SffOpticalProcessorTests
     }
 
     [Fact]
-    public async Task ImplementsModeLifecycleAndSimpleOriginalCommands()
+    public async Task ImplementsModeLifecycleAndSimpleProtocolCommands()
     {
         var media = new ScsiTestMedia(MediaDeviceKind.Optical, 2048, 16);
         var processor = new SffOpticalProcessor(media);
@@ -81,7 +81,7 @@ public sealed class SffOpticalProcessorTests
     [InlineData(0x4E)]
     [InlineData(0x37)]
     [InlineData(0xFF)]
-    public async Task ReturnsInvalidFieldForUnsupportedOriginalOpticalCommands(byte opcode)
+    public async Task ReturnsInvalidFieldForUnsupportedOpticalCommands(byte opcode)
     {
         var processor = new SffOpticalProcessor(new ScsiTestMedia(MediaDeviceKind.Optical, 2048, 8));
         await ConsumeUnitAttentionAsync(processor);

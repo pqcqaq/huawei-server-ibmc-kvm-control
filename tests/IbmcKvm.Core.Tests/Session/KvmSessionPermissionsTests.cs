@@ -10,7 +10,7 @@ public sealed class KvmSessionPermissionsTests
     [InlineData(2, true, false, true)]
     [InlineData(3, true, true, true)]
     [InlineData(4, true, true, true)]
-    public void MapsOriginalPrivilegeLevels(
+    public void MapsProtocolPrivilegeLevels(
         int privilege,
         bool canControlKvm,
         bool canControlPower,

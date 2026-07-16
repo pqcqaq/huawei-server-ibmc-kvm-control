@@ -19,7 +19,7 @@ public sealed class ConsoleVideoSettingsTests
     }
 
     [Fact]
-    public void MapsColorDepthLabelsToOriginalWireValues()
+    public void MapsColorDepthLabelsToProtocolWireValues()
     {
         Assert.Equal(
             new (byte Value, string Label)[]
