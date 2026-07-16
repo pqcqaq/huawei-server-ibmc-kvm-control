@@ -224,9 +224,9 @@ windows passed 150% DPI UI Automation and screenshot inspection.
 ## Current software verification baseline
 
 - Release build: 0 warnings, 0 errors.
-- Protocol tests: 166 passed; Core tests: 122 passed; App tests: 90 passed;
-  total 378 passed.
-- Local-only desktop smoke: 64 checks across four real WPF scenarios at 150%
+- Protocol tests: 166 passed; Core tests: 125 passed; App tests: 90 passed;
+  total 381 passed.
+- Local-only desktop smoke: 68 checks across four real WPF scenarios at 150%
   DPI, including the single-row icon toolbar at minimum width, Caps/Num HID
   reports and refreshed remote lock indicators, capture/Esc release, DQT/color
   wire commands, six custom-key slots, privilege-aware controls, graceful-EOF

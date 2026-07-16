@@ -47,24 +47,45 @@ internal static class DesktopAutomation
     }
 
     public static void PressEscape()
+        => PressKey(EscapeVirtualKey);
+
+    public static void PressKey(ushort virtualKey)
     {
         Send(
         [
             new Input
             {
                 Type = InputKeyboard,
-                Data = new InputUnion { Keyboard = new KeyboardInput { VirtualKey = EscapeVirtualKey } },
+                Data = new InputUnion { Keyboard = new KeyboardInput { VirtualKey = virtualKey } },
             },
             new Input
             {
                 Type = InputKeyboard,
                 Data = new InputUnion
                 {
-                    Keyboard = new KeyboardInput { VirtualKey = EscapeVirtualKey, Flags = KeyUp },
+                    Keyboard = new KeyboardInput { VirtualKey = virtualKey, Flags = KeyUp },
                 },
             },
         ]);
     }
+
+    public static void SendKeyDown(ushort virtualKey) => Send(
+    [
+        new Input
+        {
+            Type = InputKeyboard,
+            Data = new InputUnion { Keyboard = new KeyboardInput { VirtualKey = virtualKey } },
+        },
+    ]);
+
+    public static void SendKeyUp(ushort virtualKey) => Send(
+    [
+        new Input
+        {
+            Type = InputKeyboard,
+            Data = new InputUnion { Keyboard = new KeyboardInput { VirtualKey = virtualKey, Flags = KeyUp } },
+        },
+    ]);
 
     public static Task<AutomationInspection> InspectWindowAsync(
         nint windowHandle,

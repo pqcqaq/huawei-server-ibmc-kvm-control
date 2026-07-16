@@ -308,6 +308,116 @@ public sealed class KvmClientSessionTests
         await serverTask;
     }
 
+    [Theory]
+    [InlineData(KvmKeyboardEncoding.LegacyPlain)]
+    [InlineData(KvmKeyboardEncoding.CodeKeyAes)]
+    public async Task SerializesConcurrentKeyboardPulses(KvmKeyboardEncoding encoding)
+    {
+        var listener = StartListener();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var firstPressReceived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var commands = new List<byte[]>();
+        var serverTask = RunServerAsync(listener, async (stream, cancellationToken) =>
+        {
+            await CompleteHandshakeAsync(stream, cancellationToken);
+            while (commands.Count < 4)
+            {
+                var payload = await ReadUntilCommandPayloadAsync(stream, 0x03, cancellationToken);
+                commands.Add(payload);
+                if (commands.Count == 1)
+                {
+                    firstPressReceived.TrySetResult();
+                }
+            }
+        }, timeout.Token);
+
+        await using var session = await KvmClientSession.ConnectAsync(
+            new KvmConnectionOptions(
+                "127.0.0.1",
+                GetPort(listener),
+                0x01020304,
+                KeyboardEncoding: encoding),
+            timeout.Token);
+
+        var firstPulse = session.SendKeyPulseAsync(
+            HidModifiers.None,
+            0x04,
+            TimeSpan.FromMilliseconds(100),
+            timeout.Token);
+        await firstPressReceived.Task.WaitAsync(timeout.Token);
+        var secondPulse = session.SendKeyPulseAsync(
+            HidModifiers.None,
+            0x05,
+            TimeSpan.Zero,
+            timeout.Token);
+        await Task.WhenAll(firstPulse, secondPulse);
+        await serverTask;
+
+        var reports = new[]
+        {
+            Convert.FromHexString("0000040000000000"),
+            new byte[8],
+            Convert.FromHexString("0000050000000000"),
+            new byte[8],
+        };
+        Assert.Equal(
+            reports.Select(report => KvmCommandBuilder.Keyboard(1, report, 0x01020304, encoding)),
+            commands);
+    }
+
+    [Fact]
+    public async Task DoesNotInterleavePhysicalPulseWithKeyCombination()
+    {
+        var listener = StartListener();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var combinationPressReceived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var reports = new List<byte[]>();
+        var serverTask = RunServerAsync(listener, async (stream, cancellationToken) =>
+        {
+            await CompleteHandshakeAsync(stream, cancellationToken);
+            while (reports.Count < 4)
+            {
+                var payload = await ReadUntilCommandPayloadAsync(stream, 0x03, cancellationToken);
+                reports.Add(payload[2..]);
+                if (reports.Count == 1)
+                {
+                    combinationPressReceived.TrySetResult();
+                }
+            }
+        }, timeout.Token);
+
+        await using var session = await KvmClientSession.ConnectAsync(
+            new KvmConnectionOptions(
+                "127.0.0.1",
+                GetPort(listener),
+                7,
+                KeyboardEncoding: KvmKeyboardEncoding.LegacyPlain),
+            timeout.Token);
+
+        var combination = session.SendKeyCombinationAsync(
+            HidKeyCombination.CtrlAltDelete,
+            TimeSpan.FromMilliseconds(100),
+            timeout.Token);
+        await combinationPressReceived.Task.WaitAsync(timeout.Token);
+        var physicalPulse = session.SendKeyPulseAsync(
+            HidModifiers.LeftShift,
+            0x04,
+            TimeSpan.Zero,
+            timeout.Token);
+        await Task.WhenAll(combination, physicalPulse);
+        await serverTask;
+
+        Assert.Equal(
+            new[]
+            {
+                Convert.FromHexString("05004C0000000000"),
+                new byte[8],
+                Convert.FromHexString("0200040000000000"),
+                Convert.FromHexString("0200000000000000"),
+            },
+            reports);
+    }
+
     [Fact]
     public async Task NegotiatesEncryptedSessionAndNormalizesEncryptedData()
     {

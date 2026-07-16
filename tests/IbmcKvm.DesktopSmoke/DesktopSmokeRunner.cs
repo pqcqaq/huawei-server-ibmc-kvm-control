@@ -222,6 +222,76 @@ internal sealed class DesktopSmokeRunner(Application application, string outputD
                 server.Commands.Count(static payload => payload.SequenceEqual(new byte[] { 0x04, 1, 1 })) >= 3,
                 "Each lock-key toggle re-queries the remote lock state.");
 
+            await ActivateViewerAsync(window, videoHost, inputStatus, timeout.Token);
+            var keyboardCommandCount = server.Commands.Count(static payload => payload[0] == 0x03);
+            DesktopAutomation.PressKey(0x41);
+            var realKeyReports = await ReadKeyboardReportsAsync(
+                server,
+                keyboardCommandCount,
+                2,
+                "real Windows A key reports",
+                timeout.Token);
+            Check(
+                realKeyReports[0].SequenceEqual(new byte[] { 0x03, 1, 0, 0, 0x04, 0, 0, 0, 0, 0 }) &&
+                realKeyReports[1].SequenceEqual(new byte[] { 0x03, 1, 0, 0, 0, 0, 0, 0, 0, 0 }),
+                "A real Windows A press reaches WPF and emits one isolated key pulse.");
+
+            keyboardCommandCount += 2;
+            DesktopAutomation.SendKeyDown(0x41);
+            DesktopAutomation.SendKeyDown(0x42);
+            DesktopAutomation.SendKeyUp(0x41);
+            DesktopAutomation.SendKeyUp(0x42);
+            var fastReports = await ReadKeyboardReportsAsync(
+                server,
+                keyboardCommandCount,
+                4,
+                "fast overlapping A and B reports",
+                timeout.Token);
+            Check(
+                fastReports[0].SequenceEqual(new byte[] { 0x03, 1, 0, 0, 0x04, 0, 0, 0, 0, 0 }) &&
+                fastReports[1].SequenceEqual(new byte[] { 0x03, 1, 0, 0, 0, 0, 0, 0, 0, 0 }) &&
+                fastReports[2].SequenceEqual(new byte[] { 0x03, 1, 0, 0, 0x05, 0, 0, 0, 0, 0 }) &&
+                fastReports[3].SequenceEqual(new byte[] { 0x03, 1, 0, 0, 0, 0, 0, 0, 0, 0 }),
+                "Fast overlapping letters remain ordered without duplicating the older character.");
+
+            keyboardCommandCount += 4;
+            RaiseRemoteKeyDown(videoHost, Key.C);
+            RaiseRemoteKeyDown(videoHost, Key.C);
+            RaiseRemoteKeyDown(videoHost, Key.C);
+            RaiseRemoteKeyUp(videoHost, Key.C);
+            var repeatReports = await ReadKeyboardReportsAsync(
+                server,
+                keyboardCommandCount,
+                6,
+                "repeated WPF C key reports",
+                timeout.Token);
+            var repeatedSequenceIsValid = repeatReports.Chunk(2).All(static pulse =>
+                pulse[0].SequenceEqual(new byte[] { 0x03, 1, 0, 0, 0x06, 0, 0, 0, 0, 0 }) &&
+                pulse[1].SequenceEqual(new byte[] { 0x03, 1, 0, 0, 0, 0, 0, 0, 0, 0 }));
+            Check(
+                repeatedSequenceIsValid,
+                repeatedSequenceIsValid
+                    ? "Repeated WPF KeyDown messages produce repeated remote C pulses."
+                    : $"Repeated C sequence was {string.Join(", ", repeatReports.Select(Convert.ToHexString))}.");
+
+            keyboardCommandCount += 6;
+            DesktopAutomation.SendKeyDown(0x10);
+            DesktopAutomation.SendKeyDown(0x41);
+            DesktopAutomation.SendKeyUp(0x41);
+            DesktopAutomation.SendKeyUp(0x10);
+            var shiftedReports = await ReadKeyboardReportsAsync(
+                server,
+                keyboardCommandCount,
+                4,
+                "real Windows Shift+A reports",
+                timeout.Token);
+            Check(
+                shiftedReports[0].SequenceEqual(new byte[] { 0x03, 1, 2, 0, 0, 0, 0, 0, 0, 0 }) &&
+                shiftedReports[1].SequenceEqual(new byte[] { 0x03, 1, 2, 0, 0x04, 0, 0, 0, 0, 0 }) &&
+                shiftedReports[2].SequenceEqual(new byte[] { 0x03, 1, 2, 0, 0, 0, 0, 0, 0, 0 }) &&
+                shiftedReports[3].SequenceEqual(new byte[] { 0x03, 1, 0, 0, 0, 0, 0, 0, 0, 0 }),
+                "Physical modifiers remain held around a pulsed character and release afterward.");
+
             Check(
                 capturedMouse.IsChecked && quality60.IsChecked && eightBitColor.IsChecked &&
                 mouseMode.ToolTip?.ToString()?.Contains("捕获", StringComparison.Ordinal) == true &&
@@ -567,16 +637,42 @@ internal sealed class DesktopSmokeRunner(Application application, string outputD
 
     private static void RaiseRemoteKey(UIElement target, Key key)
     {
+        RaiseRemoteKeyDown(target, key);
+        RaiseRemoteKeyUp(target, key);
+    }
+
+    private static void RaiseRemoteKeyDown(UIElement target, Key key) =>
+        RaiseRemoteKeyEvent(target, key, Keyboard.PreviewKeyDownEvent);
+
+    private static void RaiseRemoteKeyUp(UIElement target, Key key) =>
+        RaiseRemoteKeyEvent(target, key, Keyboard.PreviewKeyUpEvent);
+
+    private static void RaiseRemoteKeyEvent(UIElement target, Key key, RoutedEvent routedEvent)
+    {
         var source = PresentationSource.FromVisual(target) ??
                      throw new InvalidOperationException("The remote viewer does not have a presentation source.");
         target.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, source, Environment.TickCount, key)
         {
-            RoutedEvent = Keyboard.PreviewKeyDownEvent,
+            RoutedEvent = routedEvent,
         });
-        target.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, source, Environment.TickCount, key)
-        {
-            RoutedEvent = Keyboard.PreviewKeyUpEvent,
-        });
+    }
+
+    private static async Task<byte[][]> ReadKeyboardReportsAsync(
+        LoopbackKvmServer server,
+        int skip,
+        int count,
+        string description,
+        CancellationToken cancellationToken)
+    {
+        await WaitForAsync(
+            () => server.Commands.Count(static payload => payload[0] == 0x03) >= skip + count,
+            description,
+            cancellationToken);
+        return server.Commands
+            .Where(static payload => payload[0] == 0x03)
+            .Skip(skip)
+            .Take(count)
+            .ToArray();
     }
 
     private static bool HasColor(Brush? brush, Color expected) =>

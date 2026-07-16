@@ -139,6 +139,7 @@ public sealed class KvmClientSession : IAsyncDisposable
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly SemaphoreSlim virtualMediaQueryGate = new(1, 1);
     private readonly SemaphoreSlim chassisPresenceQueryGate = new(1, 1);
+    private readonly SemaphoreSlim keyboardSendGate = new(1, 1);
     private readonly object chassisPresenceGate = new();
     private readonly object bladeStateQueryGate = new();
     private readonly Dictionary<byte, TaskCompletionSource<ChassisBladeState>> bladeStateQueries = [];
@@ -571,17 +572,63 @@ public sealed class KvmClientSession : IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         EnsureKvmControlAllowed();
+        if (report.Length != 8)
+        {
+            throw new ArgumentException("A boot-protocol keyboard report contains 8 bytes", nameof(report));
+        }
+
+        await keyboardSendGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await SendKeyboardCoreAsync(report, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            keyboardSendGate.Release();
+        }
+    }
+
+    public async Task SendKeyPulseAsync(
+        HidModifiers modifiers,
+        byte usage,
+        TimeSpan? holdDuration = null,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureKvmControlAllowed();
+        if (usage is 0 or 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(usage));
+        }
+
+        var duration = ValidateKeyboardHoldDuration(holdDuration, TimeSpan.FromMilliseconds(20));
+        var pressed = new byte[8];
+        pressed[0] = (byte)modifiers;
+        pressed[2] = usage;
+        var released = new byte[8];
+        released[0] = (byte)modifiers;
+
+        await keyboardSendGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await SendKeyboardPressAndReleaseAsync(pressed, released, duration, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            keyboardSendGate.Release();
+        }
+    }
+
+    private async ValueTask SendKeyboardCoreAsync(
+        ReadOnlyMemory<byte> report,
+        CancellationToken cancellationToken)
+    {
         if (!options.Encrypted)
         {
             await SendAsync(
                 KvmCommandBuilder.Keyboard(options.BladeNumber, report.Span, options.CodeKey, options.KeyboardEncoding),
                 cancellationToken).ConfigureAwait(false);
             return;
-        }
-
-        if (report.Length != 8)
-        {
-            throw new ArgumentException("A boot-protocol keyboard report contains 8 bytes", nameof(report));
         }
 
         await SendEncryptedInputAsync(0x03, report, cancellationToken).ConfigureAwait(false);
@@ -593,21 +640,36 @@ public sealed class KvmClientSession : IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(combination);
-        var duration = holdDuration ?? TimeSpan.FromMilliseconds(100);
-        if (duration < TimeSpan.Zero || duration > TimeSpan.FromSeconds(5))
-        {
-            throw new ArgumentOutOfRangeException(nameof(holdDuration));
-        }
+        EnsureKvmControlAllowed();
+        var duration = ValidateKeyboardHoldDuration(holdDuration, TimeSpan.FromMilliseconds(100));
 
         var pressed = combination.CreateReport();
+        await keyboardSendGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await SendKeyboardPressAndReleaseAsync(pressed, new byte[8], duration, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            keyboardSendGate.Release();
+        }
+    }
+
+    private async Task SendKeyboardPressAndReleaseAsync(
+        ReadOnlyMemory<byte> pressed,
+        ReadOnlyMemory<byte> released,
+        TimeSpan holdDuration,
+        CancellationToken cancellationToken)
+    {
         var sent = false;
         try
         {
-            await SendKeyboardAsync(pressed, cancellationToken).ConfigureAwait(false);
+            await SendKeyboardCoreAsync(pressed, cancellationToken).ConfigureAwait(false);
             sent = true;
-            if (duration > TimeSpan.Zero)
+            if (holdDuration > TimeSpan.Zero)
             {
-                await Task.Delay(duration, cancellationToken).ConfigureAwait(false);
+                await Task.Delay(holdDuration, cancellationToken).ConfigureAwait(false);
             }
         }
         finally
@@ -615,9 +677,20 @@ public sealed class KvmClientSession : IAsyncDisposable
             if (sent)
             {
                 using var releaseTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-                await SendKeyboardAsync(new byte[8], releaseTimeout.Token).ConfigureAwait(false);
+                await SendKeyboardCoreAsync(released, releaseTimeout.Token).ConfigureAwait(false);
             }
         }
+    }
+
+    private static TimeSpan ValidateKeyboardHoldDuration(TimeSpan? holdDuration, TimeSpan defaultDuration)
+    {
+        var duration = holdDuration ?? defaultDuration;
+        if (duration < TimeSpan.Zero || duration > TimeSpan.FromSeconds(5))
+        {
+            throw new ArgumentOutOfRangeException(nameof(holdDuration));
+        }
+
+        return duration;
     }
 
     public ValueTask RequestKeyboardStateAsync(CancellationToken cancellationToken = default) =>
@@ -980,6 +1053,7 @@ public sealed class KvmClientSession : IAsyncDisposable
             }
             virtualMediaQueryGate.Dispose();
             chassisPresenceQueryGate.Dispose();
+            keyboardSendGate.Dispose();
             lifetime.Dispose();
         }
     }
