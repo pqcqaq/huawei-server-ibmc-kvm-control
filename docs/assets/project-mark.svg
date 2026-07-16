@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" role="img" aria-labelledby="title desc">
+  <title id="title">iBMC KVM project mark</title>
+  <desc id="desc">A white letter K on an emerald tile inside a dark frame.</desc>
+  <rect x="2" y="2" width="92" height="92" rx="12" fill="#101814" stroke="#2a3b33" stroke-width="2"/>
+  <rect x="15" y="15" width="66" height="66" rx="8" fill="#17a673"/>
+  <path d="M31 27h9v18l16-18h11L49 47.5 68 69H56L40 51v18h-9z" fill="#ffffff"/>
+</svg>

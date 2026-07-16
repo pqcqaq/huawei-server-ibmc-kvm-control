@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="380" viewBox="0 0 1200 380" role="img" aria-labelledby="title desc">
+  <title id="title">Repository activity</title>
+  <desc id="desc">Cumulative commits increased from 8 on July 14 to 10 on July 15 and 20 on July 16, 2026.</desc>
+  <style>
+    .title { fill: #111827; font: 700 24px "Segoe UI", sans-serif; }
+    .subtitle { fill: #64748b; font: 14px "Segoe UI", sans-serif; }
+    .metric { fill: #0f172a; font: 700 42px "Segoe UI", sans-serif; }
+    .metric-label { fill: #64748b; font: 13px "Segoe UI", sans-serif; letter-spacing: 1px; }
+    .axis { fill: #64748b; font: 12px "Segoe UI", sans-serif; }
+    .value { fill: #0f766e; font: 700 13px "Segoe UI", sans-serif; }
+    .grid { stroke: #cbd5e1; stroke-width: 1; opacity: .55; }
+    .area { fill: #14b88a; opacity: .09; }
+    .line { fill: none; stroke: #0f9f75; stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; }
+    .point { fill: #ffffff; stroke: #0f9f75; stroke-width: 4; }
+    @media (prefers-color-scheme: dark) {
+      .title, .metric { fill: #f1f5f9; }
+      .subtitle, .metric-label, .axis { fill: #94a3b8; }
+      .grid { stroke: #475569; opacity: .6; }
+      .point { fill: #0d1117; }
+      .value { fill: #34d399; }
+      .line { stroke: #20c997; }
+      .area { fill: #20c997; opacity: .12; }
+    }
+  </style>
+
+  <text class="title" x="64" y="48">Repository activity</text>
+  <text class="subtitle" x="64" y="75">Cumulative commits · 14–16 July 2026</text>
+  <text class="metric" x="1070" y="52" text-anchor="end">20</text>
+  <text class="metric-label" x="1070" y="74" text-anchor="end">COMMITS</text>
+
+  <line class="grid" x1="84" y1="112" x2="1110" y2="112"/>
+  <line class="grid" x1="84" y1="162" x2="1110" y2="162"/>
+  <line class="grid" x1="84" y1="212" x2="1110" y2="212"/>
+  <line class="grid" x1="84" y1="262" x2="1110" y2="262"/>
+  <line class="grid" x1="84" y1="312" x2="1110" y2="312"/>
+
+  <text class="axis" x="68" y="116" text-anchor="end">20</text>
+  <text class="axis" x="68" y="166" text-anchor="end">15</text>
+  <text class="axis" x="68" y="216" text-anchor="end">10</text>
+  <text class="axis" x="68" y="266" text-anchor="end">5</text>
+  <text class="axis" x="68" y="316" text-anchor="end">0</text>
+
+  <path class="area" d="M120 232 C270 232 425 212 598 212 C770 212 910 112 1075 112 L1075 312 L120 312 Z"/>
+  <path class="line" d="M120 232 C270 232 425 212 598 212 C770 212 910 112 1075 112"/>
+
+  <circle class="point" cx="120" cy="232" r="7"/>
+  <circle class="point" cx="598" cy="212" r="7"/>
+  <circle class="point" cx="1075" cy="112" r="7"/>
+
+  <text class="value" x="120" y="212" text-anchor="middle">8</text>
+  <text class="value" x="598" y="192" text-anchor="middle">10</text>
+  <text class="value" x="1075" y="96" text-anchor="middle">20</text>
+
+  <text class="axis" x="120" y="344" text-anchor="middle">JUL 14</text>
+  <text class="axis" x="598" y="344" text-anchor="middle">JUL 15</text>
+  <text class="axis" x="1075" y="344" text-anchor="middle">JUL 16</text>
+</svg>
