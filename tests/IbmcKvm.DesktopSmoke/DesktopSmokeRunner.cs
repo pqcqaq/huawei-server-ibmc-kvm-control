@@ -197,6 +197,31 @@ internal sealed class DesktopSmokeRunner(Application application, string outputD
                 HasColor(capsLock.Fill, Color.FromRgb(89, 99, 95)) &&
                 HasColor(scrollLock.Fill, Color.FromRgb(240, 198, 116)),
                 "Remote Num/Scroll indicators turn on while Caps remains off.");
+
+            await ActivateViewerAsync(window, videoHost, inputStatus, timeout.Token);
+            RaiseRemoteKey(videoHost, Key.CapsLock);
+            await WaitForAsync(
+                () => HasColor(capsLock.Fill, Color.FromRgb(240, 198, 116)),
+                "refreshed remote Caps Lock state",
+                timeout.Token);
+            Check(
+                server.Commands.Any(static payload =>
+                    payload.SequenceEqual(new byte[] { 0x03, 1, 0, 0, 0x39, 0, 0, 0, 0, 0 })),
+                "Caps Lock sends HID usage 0x39 and refreshes its remote indicator.");
+
+            RaiseRemoteKey(videoHost, Key.NumLock);
+            await WaitForAsync(
+                () => HasColor(numLock.Fill, Color.FromRgb(89, 99, 95)),
+                "refreshed remote Num Lock state",
+                timeout.Token);
+            Check(
+                server.Commands.Any(static payload =>
+                    payload.SequenceEqual(new byte[] { 0x03, 1, 0, 0, 0x53, 0, 0, 0, 0, 0 })),
+                "Num Lock sends HID usage 0x53 and refreshes its remote indicator.");
+            Check(
+                server.Commands.Count(static payload => payload.SequenceEqual(new byte[] { 0x04, 1, 1 })) >= 3,
+                "Each lock-key toggle re-queries the remote lock state.");
+
             Check(
                 capturedMouse.IsChecked && quality60.IsChecked && eightBitColor.IsChecked &&
                 mouseMode.ToolTip?.ToString()?.Contains("捕获", StringComparison.Ordinal) == true &&
@@ -539,6 +564,20 @@ internal sealed class DesktopSmokeRunner(Application application, string outputD
 
     private static void RaiseClick(MenuItem item) =>
         item.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent, item));
+
+    private static void RaiseRemoteKey(UIElement target, Key key)
+    {
+        var source = PresentationSource.FromVisual(target) ??
+                     throw new InvalidOperationException("The remote viewer does not have a presentation source.");
+        target.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, source, Environment.TickCount, key)
+        {
+            RoutedEvent = Keyboard.PreviewKeyDownEvent,
+        });
+        target.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, source, Environment.TickCount, key)
+        {
+            RoutedEvent = Keyboard.PreviewKeyUpEvent,
+        });
+    }
 
     private static bool HasColor(Brush? brush, Color expected) =>
         brush is SolidColorBrush solid && solid.Color == expected;

@@ -20,6 +20,7 @@ internal sealed class LoopbackKvmServer : IAsyncDisposable
     private readonly CancellationTokenSource lifetime = new();
     private readonly SemaphoreSlim writeLock = new(1, 1);
     private readonly ConcurrentQueue<byte[]> commands = new();
+    private readonly HashSet<byte> pressedLockKeys = [];
     private readonly TaskCompletionSource failureTrigger = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly LoopbackFailureMode failureMode;
     private readonly byte[] reconnectToken = Enumerable.Range(0, 128).Select(static value => (byte)value).ToArray();
@@ -27,6 +28,7 @@ internal sealed class LoopbackKvmServer : IAsyncDisposable
     private TcpClient? currentClient;
     private NetworkStream? currentStream;
     private Exception? failure;
+    private byte remoteLockKeys = 0x05;
     private int connectionCount;
 
     public LoopbackKvmServer(LoopbackFailureMode failureMode = LoopbackFailureMode.None)
@@ -199,7 +201,10 @@ internal sealed class LoopbackKvmServer : IAsyncDisposable
             switch (payload[0])
             {
                 case 0x04:
-                    await SendIncomingAsync(stream, [0x04, 1, 0x05], cancellationToken).ConfigureAwait(false);
+                    await SendIncomingAsync(stream, [0x04, 1, remoteLockKeys], cancellationToken).ConfigureAwait(false);
+                    break;
+                case 0x03 when payload.Length >= 10:
+                    ApplyKeyboardReport(payload.AsSpan(2, 8));
                     break;
                 case 0x24 when payload.Length >= 3:
                     await SendIncomingAsync(stream, [0x25, 1, payload[2]], cancellationToken).ConfigureAwait(false);
@@ -209,6 +214,31 @@ internal sealed class LoopbackKvmServer : IAsyncDisposable
                     break;
             }
         }
+    }
+
+    private void ApplyKeyboardReport(ReadOnlySpan<byte> report)
+    {
+        var currentLockKeys = report[2..]
+            .ToArray()
+            .Where(static usage => usage is 0x39 or 0x47 or 0x53)
+            .ToHashSet();
+        foreach (var usage in currentLockKeys)
+        {
+            if (pressedLockKeys.Contains(usage))
+            {
+                continue;
+            }
+
+            remoteLockKeys ^= usage switch
+            {
+                0x53 => (byte)0x01,
+                0x39 => (byte)0x02,
+                _ => (byte)0x04,
+            };
+        }
+
+        pressedLockKeys.Clear();
+        pressedLockKeys.UnionWith(currentLockKeys);
     }
 
     private async Task SendReconnectTokenAsync(NetworkStream stream, CancellationToken cancellationToken)

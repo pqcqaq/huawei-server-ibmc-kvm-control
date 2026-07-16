@@ -9,6 +9,8 @@ public enum RemoteKeyboardLayout
 
 public static class WindowsVirtualKeyMap
 {
+    public static bool IsLockKey(int virtualKey) => virtualKey is 0x14 or 0x90 or 0x91;
+
     public static bool TryGetModifier(int virtualKey, out HidModifiers modifier)
     {
         modifier = virtualKey switch

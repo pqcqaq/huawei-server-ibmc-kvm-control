@@ -695,6 +695,7 @@ public partial class MainWindow : Window, IDisposable
         }
 
         var virtualKey = GetVirtualKey(e);
+        var activeSession = session;
         var changed = WindowsVirtualKeyMap.TryGetModifier(virtualKey, out var modifier)
             ? keyboard.SetModifier(modifier, pressed: true)
             : TryPressMappedKey(virtualKey);
@@ -702,6 +703,11 @@ public partial class MainWindow : Window, IDisposable
         {
             e.Handled = true;
             await SendKeyboardSafelyAsync(keyboard.CreateReport());
+            if (activeSession is not null && WindowsVirtualKeyMap.IsLockKey(virtualKey))
+            {
+                var cancellationToken = activeRuntime?.Lifetime.Token ?? CancellationToken.None;
+                _ = RefreshRemoteLockKeysAfterInputAsync(activeSession, cancellationToken);
+            }
         }
     }
 
@@ -2115,6 +2121,27 @@ public partial class MainWindow : Window, IDisposable
             await Dispatcher.InvokeAsync(() =>
                 SetStatus(LocalizationManager.Format("远端锁定键状态查询失败：{0}", exception.Message), Brushes.Goldenrod));
         }
+    }
+
+    private async Task RefreshRemoteLockKeysAfterInputAsync(
+        KvmClientSession sourceSession,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(120), cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+
+        if (!ReferenceEquals(session, sourceSession) || connectionFailed)
+        {
+            return;
+        }
+
+        await RequestRemoteLockKeysAsync(sourceSession, cancellationToken);
     }
 
     private void Session_RemoteLockKeysChanged(object? sender, EventArgs e)

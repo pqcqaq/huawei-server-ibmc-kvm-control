@@ -28,7 +28,7 @@ each capability are tracked in `docs/legacy-feature-roadmap.md`.
 - Window-local USB HID keyboard input plus absolute, relative, and captured mouse modes with explicit pointer visibility and synchronization.
 - Modern iBMC input compatibility: code-key AES keyboard reports and confirmed absolute mouse mode.
 - Four-color input indicator in the lower-left status bar: gray disconnected, red failed, blue connected/inactive, green ready.
-- Source-compatible key presets, a six-key custom editor, US/Japanese/French layouts, remote lock LEDs, screenshots, and full-screen viewing.
+- Source-compatible key presets, a six-key custom editor, US/Japanese/French layouts, remote lock LEDs refreshed after Caps/Num/Scroll toggles, screenshots, and full-screen viewing.
 - Privilege-aware power controls, including distinct forced reset and forced power-cycle confirmations. Hardware verification never invokes them without authorization.
 - Bounded automatic KVM reconnect with post-recovery virtual-media restoration and actionable progress.
 - Local `.rep` recording and standard Motion JPEG AVI export through bounded background queues.
