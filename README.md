@@ -25,7 +25,7 @@ each capability are tracked in `docs/legacy-feature-roadmap.md`.
 - HTTPS login with explicit per-session certificate fingerprint confirmation.
 - Shared or exclusive KVM sessions with negotiated cipher-suite selection.
 - Huawei 64×64 JPEG/RLE video blocks, differential frames, and resolution changes.
-- Window-local USB HID keyboard input plus absolute, relative, and captured mouse modes with explicit pointer visibility and synchronization.
+- Window-local USB HID keyboard input with source-compatible isolated character reports and key repeat, plus absolute, relative, and captured mouse modes with explicit pointer visibility and synchronization.
 - Modern iBMC input compatibility: code-key AES keyboard reports and confirmed absolute mouse mode.
 - Four-color input indicator in the lower-left status bar: gray disconnected, red failed, blue connected/inactive, green ready.
 - Source-compatible key presets, a six-key custom editor, US/Japanese/French layouts, remote lock LEDs refreshed after Caps/Num/Scroll toggles, screenshots, and full-screen viewing.

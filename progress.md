@@ -44,7 +44,7 @@ Last updated: 2026-07-16
 - [x] Capability-oriented modern, legacy iBMC, and iMana protocol profiles with managed RMCP+/RAKP discovery, OEM login/port/encryption commands, iMana session-ID framing, and source-oracle crypto vectors
 - [x] Source-compatible `.rep` recording writer, bounded recording queue, original recording controls, and toolbar save workflow
 - [x] Source-verified DQT clarity and 8/7/6/4-bit color-depth commands, `0x28` response handling, decoder reset/full-frame recovery, toolbar selectors, and executable tests
-- [x] Full special-key presets, bounded six-key custom editor, guaranteed release reports, US/Japanese/French mappings, and remote Num/Caps/Scroll Lock indicators refreshed after each lock-key toggle
+- [x] Source-compatible fast/held character reports, full special-key presets, bounded six-key custom editor, guaranteed release reports, US/Japanese/French mappings, and remote Num/Caps/Scroll Lock indicators refreshed after each lock-key toggle
 - [x] Forced `0x23` power cycle, login privilege propagation, Core permission enforcement, capability-aware toolbar state, and operation-specific `0x51` denial handling
 - [x] MainWindow automatic KVM recovery with bounded retry progress, plain/encrypted reconnect-token handling, active-session replacement, and post-KVM virtual-media restoration
 - [x] Relative and captured/single-mouse modes, Esc release, explicit local-pointer visibility, and original absolute/relative synchronization reports without global hooks
@@ -87,16 +87,16 @@ Last updated: 2026-07-16
 - Original V1 JAR oracle: iMana PBKDF2 session ID, word-reversed data/input/IV keys, encrypted keyboard report, and encrypted video payload match managed output
 - iMana loopback: 24-byte session-ID framing, V1 connect payload, mouse-mode acknowledgement, encrypted video normalization, and encrypted keyboard send path passed
 - DQT/color-depth loopback: source-compatible `0x27` quality request and `0x28` confirmation, `0x1B` depth change, decoder reset, and full-frame requests passed
-- Keyboard loopback: `0x04` lock-state query/response, post-toggle Caps/Num refresh, source-compatible preset reports, bounded custom usages, cancellation-safe release reports, and layout mappings passed
+- Keyboard loopback: isolated fast-character reports, repeated KeyDown and modifier retention, `0x04` lock-state query/response, post-toggle Caps/Num refresh, source-compatible preset reports, bounded custom usages, cancellation-safe release reports, and layout mappings passed
 - Privilege loopback: callback/user/operator/admin policy, client-side enforcement, power denial state 1, virtual-media denial states 2/3, and dynamic toolbar rules passed
 - Reconnect loopback: bounded transient retry, authentication stop, cancellation, same-endpoint token reuse, encrypted 128-byte token decryption, mouse/color preservation, and media-after-KVM ordering passed
 - Mouse loopback: relative reports, absolute `FFFF/FFFF` synchronization, fifteen `-127/-127` relative synchronization reports, capture state, pointer visibility, and Esc release rules passed
 - Recording verification: `.rep` linked indexes beyond 20 I-frames, bounded drop behavior, RIFF/MJPG/`idx1` bytes, valid WPF JPEG chunks, and resolution normalization passed
 - Chassis verification: 14-slot reserved-bit mapping, absent/reset/unsupported/KVM busy/SOL/loading/available states, shared/exclusive queries, monitor/stop commands, four-session limit, cleanup, replacement ownership, selected-control routing, and read-only split rules passed
 - Chassis desktop inspection: connected 720x400 console and complete toolbar inspected at 150% DPI; UI Automation found zero button or selector bounds outside the 1920x1200 window. The target exposed no chassis bitmap, so live tabs/split remain a multi-blade hardware gate.
-- Current full suite: 378 passed (Protocol 166, Core 122, App 90); Release build 0 warnings, 0 errors
+- Current full suite: 379 passed (Protocol 166, Core 123, App 90); Release build 0 warnings, 0 errors
 - Dynamic localization behavior: 304 keys in each language, parameterized status/certificate/reconnect formatting, and no canonical-key translation collisions passed
-- Desktop loopback smoke: 64 checks across administrator controls, user permissions, graceful-EOF reconnect success, and retry exhaustion at 150% DPI; Caps/Num emit HID `0x39`/`0x53` and re-query remote lock state, UI Automation found no required control missing or interactive control outside its window, all six custom key slots are visible, and the captured wire contains no `0x20`/`0x21`/`0x22`/`0x23`/`0x25`/`0x30` command
+- Desktop loopback smoke: 67 checks across administrator controls, user permissions, graceful-EOF reconnect success, and retry exhaustion at 150% DPI; fast overlapping letters remain isolated, repeated KeyDown preserves long-press input, Shift remains held around a character report, Caps/Num emit HID `0x39`/`0x53` and re-query remote lock state, UI Automation found no required control missing or interactive control outside its window, all six custom key slots are visible, and the captured wire contains no `0x20`/`0x21`/`0x22`/`0x23`/`0x25`/`0x30` command
 - Desktop localization verification: 48 UI Automation/screenshot checks across zh-CN, en-US, ja-JP, and fr-FR at 150% DPI; no untranslated text, interactive overflow, or trust-header overlap
 - External AVI playback: Windows WPF MediaElement opened the generated 320x240/2-second MJPEG sample; playback positions 0.422s and 1.433s yielded different screen-frame SHA-256 hashes
 - Java input oracle: AES-CBC keyboard payload vectors match `com.kvm.AESHandler.encry` from the original JAR
