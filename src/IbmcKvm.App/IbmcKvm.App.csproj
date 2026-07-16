@@ -20,6 +20,7 @@
     <UseWPF>true</UseWPF>
     <PlatformTarget>x64</PlatformTarget>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <ApplicationIcon>Resources\IbmcKvm.ico</ApplicationIcon>
   </PropertyGroup>
 
 </Project>
