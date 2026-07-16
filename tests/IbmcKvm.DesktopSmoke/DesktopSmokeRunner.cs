@@ -463,6 +463,10 @@ internal sealed class DesktopSmokeRunner(Application application, string outputD
                 "successful desktop reconnect",
                 timeout.Token);
             Check(server.ConnectionCount == 2, "The desktop reconnects to the same loopback endpoint once.");
+            await WaitForAsync(
+                () => remoteImage.Source is not null,
+                "fresh video after desktop reconnect",
+                timeout.Token);
             Check(remoteImage.Source is not null, "The reconnected desktop receives a fresh video frame.");
             Check(
                 server.Commands.All(static payload => !IsPowerCommand(payload[0])),
