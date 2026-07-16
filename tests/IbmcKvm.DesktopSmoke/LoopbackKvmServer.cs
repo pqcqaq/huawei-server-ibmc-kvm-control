@@ -23,17 +23,24 @@ internal sealed class LoopbackKvmServer : IAsyncDisposable
     private readonly HashSet<byte> pressedLockKeys = [];
     private readonly TaskCompletionSource failureTrigger = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly LoopbackFailureMode failureMode;
+    private readonly int lockStateQueryLagCount;
     private readonly byte[] reconnectToken = Enumerable.Range(0, 128).Select(static value => (byte)value).ToArray();
     private readonly Task runTask;
     private TcpClient? currentClient;
     private NetworkStream? currentStream;
     private Exception? failure;
     private byte remoteLockKeys = 0x05;
+    private byte pendingLockKeyToggleMask;
+    private int remainingLockStateQueryLag;
     private int connectionCount;
 
-    public LoopbackKvmServer(LoopbackFailureMode failureMode = LoopbackFailureMode.None)
+    public LoopbackKvmServer(
+        LoopbackFailureMode failureMode = LoopbackFailureMode.None,
+        int lockStateQueryLagCount = 0)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(lockStateQueryLagCount);
         this.failureMode = failureMode;
+        this.lockStateQueryLagCount = lockStateQueryLagCount;
         listener.Start();
         runTask = RunAsync(lifetime.Token);
     }
@@ -201,6 +208,7 @@ internal sealed class LoopbackKvmServer : IAsyncDisposable
             switch (payload[0])
             {
                 case 0x04:
+                    ApplyPendingLockStateIfReady();
                     await SendIncomingAsync(stream, [0x04, 1, remoteLockKeys], cancellationToken).ConfigureAwait(false);
                     break;
                 case 0x03 when payload.Length >= 10:
@@ -229,16 +237,42 @@ internal sealed class LoopbackKvmServer : IAsyncDisposable
                 continue;
             }
 
-            remoteLockKeys ^= usage switch
+            var toggleMask = usage switch
             {
                 0x53 => (byte)0x01,
                 0x39 => (byte)0x02,
                 _ => (byte)0x04,
             };
+            if (lockStateQueryLagCount == 0)
+            {
+                remoteLockKeys ^= toggleMask;
+            }
+            else
+            {
+                pendingLockKeyToggleMask ^= toggleMask;
+                remainingLockStateQueryLag = lockStateQueryLagCount;
+            }
         }
 
         pressedLockKeys.Clear();
         pressedLockKeys.UnionWith(currentLockKeys);
+    }
+
+    private void ApplyPendingLockStateIfReady()
+    {
+        if (pendingLockKeyToggleMask == 0)
+        {
+            return;
+        }
+
+        if (remainingLockStateQueryLag > 0)
+        {
+            remainingLockStateQueryLag--;
+            return;
+        }
+
+        remoteLockKeys ^= pendingLockKeyToggleMask;
+        pendingLockKeyToggleMask = 0;
     }
 
     private async Task SendReconnectTokenAsync(NetworkStream stream, CancellationToken cancellationToken)

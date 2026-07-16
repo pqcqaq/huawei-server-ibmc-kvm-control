@@ -51,7 +51,7 @@ internal sealed class DesktopSmokeRunner(Application application, string outputD
 
     private async Task RunAdminControlsAsync()
     {
-        await using var server = new LoopbackKvmServer();
+        await using var server = new LoopbackKvmServer(lockStateQueryLagCount: 1);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         var session = await ConnectAsync(server, KvmPrivilegeLevel.Administrator, timeout.Token);
         var window = ShowConsole(session, "loopback-admin");
@@ -219,8 +219,8 @@ internal sealed class DesktopSmokeRunner(Application application, string outputD
                     payload.SequenceEqual(new byte[] { 0x03, 1, 0, 0, 0x53, 0, 0, 0, 0, 0 })),
                 "Num Lock sends HID usage 0x53 and refreshes its remote indicator.");
             Check(
-                server.Commands.Count(static payload => payload.SequenceEqual(new byte[] { 0x04, 1, 1 })) >= 3,
-                "Each lock-key toggle re-queries the remote lock state.");
+                server.Commands.Count(static payload => payload.SequenceEqual(new byte[] { 0x04, 1, 1 })) >= 5,
+                "Lock-key toggles retry remote-state queries after a stale response.");
 
             await ActivateViewerAsync(window, videoHost, inputStatus, timeout.Token);
             var keyboardCommandCount = server.Commands.Count(static payload => payload[0] == 0x03);

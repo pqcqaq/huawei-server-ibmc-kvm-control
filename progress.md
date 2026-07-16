@@ -36,6 +36,7 @@ Last updated: 2026-07-16
 - [x] Opt-in DPAPI-encrypted restoration of the last successful connection and explicit local-settings removal
 - [x] Modern input fix: code-key AES keyboard packets, acknowledged absolute mouse mode, focus-safe release, and four-color input readiness indicator
 - [x] Ordered keyboard input: isolated press/release pulses prevent fast-typing duplication, repeated KeyDown preserves held-key repeat, and a session gate keeps modifiers and menu combinations atomic
+- [x] Lock-indicator convergence: Caps/Num/Scroll perform bounded follow-up state queries so a stale first firmware response cannot leave the toolbar light stuck
 - [x] Non-destructive target input validation: encrypted Shift press/release, mouse movement, and live blue/green readiness transitions without clicks or characters
 - [x] Redesigned two-window UX: independent login/loading/error window, full-area video console, pinnable auto-hide toolbar, and disconnect-to-login flow
 - [x] Hardened input focus acquisition on window activation, pointer entry, and first mouse click
@@ -97,7 +98,7 @@ Last updated: 2026-07-16
 - Chassis desktop inspection: connected 720x400 console and complete toolbar inspected at 150% DPI; UI Automation found zero button or selector bounds outside the 1920x1200 window. The target exposed no chassis bitmap, so live tabs/split remain a multi-blade hardware gate.
 - Current full suite: 381 passed (Protocol 166, Core 125, App 90); Release build 0 warnings, 0 errors
 - Dynamic localization behavior: 304 keys in each language, parameterized status/certificate/reconnect formatting, and no canonical-key translation collisions passed
-- Desktop loopback smoke: 68 checks across administrator controls, user permissions, graceful-EOF reconnect success, and retry exhaustion at 150% DPI; real Windows A, fast A/B, and Shift+A input plus repeated WPF KeyDown produce ordered HID pulses, Caps/Num emit HID `0x39`/`0x53` and re-query remote lock state, UI Automation found no required control missing or interactive control outside its window, all six custom key slots are visible, and the captured wire contains no `0x20`/`0x21`/`0x22`/`0x23`/`0x25`/`0x30` command
+- Desktop loopback smoke: 68 checks across administrator controls, user permissions, graceful-EOF reconnect success, and retry exhaustion at 150% DPI; real Windows A, fast A/B, and Shift+A input plus repeated WPF KeyDown produce ordered HID pulses, Caps/Num emit HID `0x39`/`0x53` and converge after a stale first lock-state response, UI Automation found no required control missing or interactive control outside its window, all six custom key slots are visible, and the captured wire contains no `0x20`/`0x21`/`0x22`/`0x23`/`0x25`/`0x30` command
 - Desktop localization verification: 48 UI Automation/screenshot checks across zh-CN, en-US, ja-JP, and fr-FR at 150% DPI; no untranslated text, interactive overflow, or trust-header overlap
 - External AVI playback: Windows WPF MediaElement opened the generated 320x240/2-second MJPEG sample; playback positions 0.422s and 1.433s yielded different screen-frame SHA-256 hashes
 - Java input oracle: AES-CBC keyboard payload vectors match `com.kvm.AESHandler.encry` from the original JAR

@@ -227,7 +227,8 @@ windows passed 150% DPI UI Automation and screenshot inspection.
 - Protocol tests: 166 passed; Core tests: 125 passed; App tests: 90 passed;
   total 381 passed.
 - Local-only desktop smoke: 68 checks across four real WPF scenarios at 150%
-  DPI, including the single-row icon toolbar at minimum width, Caps/Num HID
+  DPI, including lock-indicator convergence when the first post-toggle firmware
+  response is stale, the single-row icon toolbar at minimum width, Caps/Num HID
   reports and refreshed remote lock indicators, capture/Esc release, DQT/color
   wire commands, six custom-key slots, privilege-aware controls, graceful-EOF
   recovery, progress, success, and retry exhaustion. No power or USB-reset

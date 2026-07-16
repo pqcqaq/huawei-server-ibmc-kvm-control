@@ -34,6 +34,12 @@ public partial class MainWindow : Window, IDisposable
     private static readonly Brush RemoteLockOnBrush = CreateFrozenBrush(Color.FromRgb(240, 198, 116));
     private static readonly Brush RemoteLockOffBrush = CreateFrozenBrush(Color.FromRgb(89, 99, 95));
     private static readonly Duration ToolbarAnimationDuration = new(TimeSpan.FromMilliseconds(160));
+    private static readonly TimeSpan[] RemoteLockRefreshDelays =
+    [
+        TimeSpan.FromMilliseconds(120),
+        TimeSpan.FromMilliseconds(250),
+        TimeSpan.FromMilliseconds(500),
+    ];
     private readonly HidKeyboardState keyboard = new();
     private readonly FloatingToolbarState toolbarState = new();
     private readonly KvmSessionSupervisor sessionSupervisor = new();
@@ -2160,21 +2166,24 @@ public partial class MainWindow : Window, IDisposable
         KvmClientSession sourceSession,
         CancellationToken cancellationToken)
     {
-        try
+        foreach (var retryDelay in RemoteLockRefreshDelays)
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(120), cancellationToken);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            return;
-        }
+            try
+            {
+                await Task.Delay(retryDelay, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
 
-        if (!ReferenceEquals(session, sourceSession) || connectionFailed)
-        {
-            return;
-        }
+            if (!ReferenceEquals(session, sourceSession) || connectionFailed)
+            {
+                return;
+            }
 
-        await RequestRemoteLockKeysAsync(sourceSession, cancellationToken);
+            await RequestRemoteLockKeysAsync(sourceSession, cancellationToken);
+        }
     }
 
     private void Session_RemoteLockKeysChanged(object? sender, EventArgs e)
