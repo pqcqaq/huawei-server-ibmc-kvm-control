@@ -155,7 +155,7 @@
             <Border.RenderTransform>
                 <TranslateTransform x:Name="ToolbarTranslateTransform" />
             </Border.RenderTransform>
-            <WrapPanel MaxWidth="800" Orientation="Horizontal">
+            <StackPanel x:Name="ConsoleToolbarItems" Orientation="Horizontal">
                 <ToggleButton x:Name="PinToolbarButton" Style="{StaticResource OverlayToggleButton}"
                               IsChecked="True" Click="PinToolbarButton_Click"
                               ToolTip="取消固定，鼠标离开后自动隐藏">
@@ -171,13 +171,20 @@
                     <TextBlock Text="&#xECA5;" FontFamily="Segoe Fluent Icons" FontSize="17" Foreground="White" />
                 </ToggleButton>
 
-                <ComboBox x:Name="MouseModeComboBox" Width="76" Height="30" Margin="5,4"
-                          SelectionChanged="MouseModeComboBox_SelectionChanged"
-                          ToolTip="鼠标模式">
-                    <ComboBoxItem Content="绝对" Tag="Absolute" />
-                    <ComboBoxItem Content="相对" Tag="Relative" />
-                    <ComboBoxItem Content="捕获" Tag="Captured" />
-                </ComboBox>
+                <Button x:Name="MouseModeButton" Style="{StaticResource OverlayToolButton}"
+                        Click="ContextMenuButton_Click" ToolTip="鼠标模式">
+                    <Button.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="绝对" Tag="Absolute" IsCheckable="True"
+                                      Click="MouseModeMenuItem_Click" />
+                            <MenuItem Header="相对" Tag="Relative" IsCheckable="True"
+                                      Click="MouseModeMenuItem_Click" />
+                            <MenuItem Header="捕获" Tag="Captured" IsCheckable="True"
+                                      Click="MouseModeMenuItem_Click" />
+                        </ContextMenu>
+                    </Button.ContextMenu>
+                    <TextBlock Text="&#xE7C9;" FontFamily="Segoe Fluent Icons" FontSize="17" Foreground="White" />
+                </Button>
 
                 <ToggleButton x:Name="ShowLocalPointerButton" Style="{StaticResource OverlayToggleButton}"
                               IsChecked="True" Click="ShowLocalPointerButton_Click"
@@ -189,14 +196,32 @@
                     <TextBlock Text="&#xE895;" FontFamily="Segoe Fluent Icons" FontSize="16" Foreground="White" />
                 </Button>
 
-                <ComboBox x:Name="VideoQualityComboBox" Width="82" Height="30" Margin="2,4"
-                          DisplayMemberPath="Label" SelectedValuePath="Value"
-                          SelectionChanged="VideoQualityComboBox_SelectionChanged"
-                          ToolTip="图像清晰度" />
-                <ComboBox x:Name="ColorDepthComboBox" Width="70" Height="30" Margin="2,4"
-                          DisplayMemberPath="Label" SelectedValuePath="Value"
-                          SelectionChanged="ColorDepthComboBox_SelectionChanged"
-                          ToolTip="颜色位数" />
+                <Button x:Name="VideoQualityButton" Style="{StaticResource OverlayToolButton}"
+                        Click="ContextMenuButton_Click" ToolTip="图像清晰度">
+                    <Button.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="低 40" Tag="40" IsCheckable="True" Click="VideoQualityMenuItem_Click" />
+                            <MenuItem Header="低 50" Tag="50" IsCheckable="True" Click="VideoQualityMenuItem_Click" />
+                            <MenuItem Header="中 60" Tag="60" IsCheckable="True" Click="VideoQualityMenuItem_Click" />
+                            <MenuItem Header="中 70" Tag="70" IsCheckable="True" Click="VideoQualityMenuItem_Click" />
+                            <MenuItem Header="高 80" Tag="80" IsCheckable="True" Click="VideoQualityMenuItem_Click" />
+                            <MenuItem Header="高 90" Tag="90" IsCheckable="True" Click="VideoQualityMenuItem_Click" />
+                        </ContextMenu>
+                    </Button.ContextMenu>
+                    <TextBlock Text="&#xE91B;" FontFamily="Segoe Fluent Icons" FontSize="17" Foreground="White" />
+                </Button>
+                <Button x:Name="ColorDepthButton" Style="{StaticResource OverlayToolButton}"
+                        Click="ContextMenuButton_Click" ToolTip="颜色位数">
+                    <Button.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="8-bit" Tag="2" IsCheckable="True" Click="ColorDepthMenuItem_Click" />
+                            <MenuItem Header="7-bit" Tag="1" IsCheckable="True" Click="ColorDepthMenuItem_Click" />
+                            <MenuItem Header="6-bit" Tag="0" IsCheckable="True" Click="ColorDepthMenuItem_Click" />
+                            <MenuItem Header="4-bit" Tag="3" IsCheckable="True" Click="ColorDepthMenuItem_Click" />
+                        </ContextMenu>
+                    </Button.ContextMenu>
+                    <TextBlock Text="&#xE790;" FontFamily="Segoe Fluent Icons" FontSize="17" Foreground="White" />
+                </Button>
 
                 <Border Width="1" Height="24" Background="#53615B" Margin="5,7" />
 
@@ -291,7 +316,7 @@
                         Click="DisconnectButton_Click" ToolTip="关闭连接并返回登录">
                     <TextBlock Text="&#xE8BB;" FontFamily="Segoe Fluent Icons" FontSize="17" Foreground="#F08B83" />
                 </Button>
-            </WrapPanel>
+            </StackPanel>
         </Border>
     </Grid>
 </Window>

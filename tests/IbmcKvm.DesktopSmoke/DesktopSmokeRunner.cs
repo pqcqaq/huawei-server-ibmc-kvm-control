@@ -17,11 +17,11 @@ internal sealed class DesktopSmokeRunner(Application application, string outputD
 
     private static readonly string[] RequiredConsoleAutomationIds =
     [
-        "MouseModeComboBox",
+        "MouseModeButton",
         "ShowLocalPointerButton",
         "SynchronizeMouseButton",
-        "VideoQualityComboBox",
-        "ColorDepthComboBox",
+        "VideoQualityButton",
+        "ColorDepthButton",
         "VirtualMediaButton",
         "KeyboardMenuButton",
         "PowerMenuButton",
@@ -62,11 +62,12 @@ internal sealed class DesktopSmokeRunner(Application application, string outputD
             var remoteImage = FindNamed<Image>(window, "RemoteImage");
             var status = FindNamed<TextBlock>(window, "StatusMessageText");
             var inputStatus = FindNamed<TextBlock>(window, "InputStatusText");
-            var mouseMode = FindNamed<ComboBox>(window, "MouseModeComboBox");
+            var toolbar = FindNamed<StackPanel>(window, "ConsoleToolbarItems");
+            var mouseMode = FindNamed<Button>(window, "MouseModeButton");
             var showPointer = FindNamed<ToggleButton>(window, "ShowLocalPointerButton");
             var synchronizeMouse = FindNamed<Button>(window, "SynchronizeMouseButton");
-            var videoQuality = FindNamed<ComboBox>(window, "VideoQualityComboBox");
-            var colorDepth = FindNamed<ComboBox>(window, "ColorDepthComboBox");
+            var videoQuality = FindNamed<Button>(window, "VideoQualityButton");
+            var colorDepth = FindNamed<Button>(window, "ColorDepthButton");
             var keyboardButton = FindNamed<Button>(window, "KeyboardMenuButton");
             var powerButton = FindNamed<Button>(window, "PowerMenuButton");
             var virtualMediaButton = FindNamed<Button>(window, "VirtualMediaButton");
@@ -74,6 +75,11 @@ internal sealed class DesktopSmokeRunner(Application application, string outputD
             await WaitForAsync(() => remoteImage.Source is not null, "the first loopback video frame", timeout.Token);
             await ActivateViewerAsync(window, videoHost, inputStatus, timeout.Token);
             Check(powerButton.IsEnabled && virtualMediaButton.IsEnabled, "Administrator power and media controls are enabled.");
+            window.Width = window.MinWidth;
+            await window.Dispatcher.InvokeAsync(window.UpdateLayout, System.Windows.Threading.DispatcherPriority.Render);
+            Check(
+                toolbar.ActualHeight <= 38.5 && IsInsideWindow(window, toolbar),
+                "The icon toolbar remains a single row inside the minimum-width console.");
 
             var inspection = await DesktopAutomation.InspectWindowAsync(
                 DesktopCapture.GetHandle(window),
@@ -83,7 +89,30 @@ internal sealed class DesktopSmokeRunner(Application application, string outputD
             Check(inspection.OutsideInteractiveControls.Count == 0, "Visible interactive console controls stay inside the window.");
             Check(inspection.InteractiveControlCount >= 12, "UI Automation exposes the console toolbar controls.");
 
-            mouseMode.SelectedIndex = 1;
+            foreach (var settingButton in new[] { mouseMode, videoQuality, colorDepth })
+            {
+                var buttonPoint = settingButton.PointToScreen(
+                    new Point(settingButton.ActualWidth / 2, settingButton.ActualHeight / 2));
+                DesktopAutomation.ClickAt(
+                    (int)Math.Round(buttonPoint.X),
+                    (int)Math.Round(buttonPoint.Y));
+                await WaitForAsync(
+                    () => settingButton.ContextMenu?.IsOpen == true,
+                    $"{settingButton.Name} settings menu",
+                    timeout.Token);
+                Check(
+                    settingButton.ContextMenu?.IsOpen == true,
+                    $"{settingButton.Name} opens its checked settings menu.");
+                settingButton.ContextMenu!.IsOpen = false;
+                await window.Dispatcher.InvokeAsync(
+                    window.UpdateLayout,
+                    System.Windows.Threading.DispatcherPriority.Render);
+            }
+
+            var mouseModeItems = EnumerateMenuItems(mouseMode.ContextMenu).ToArray();
+            var relativeMouse = mouseModeItems.Single(item => Equals(item.Tag, "Relative"));
+            var capturedMouse = mouseModeItems.Single(item => Equals(item.Tag, "Captured"));
+            RaiseClick(relativeMouse);
             await WaitForAsync(
                 () => session.CurrentMouseMode == KvmMouseMode.Relative && mouseMode.IsEnabled,
                 "relative mouse selection",
@@ -92,9 +121,9 @@ internal sealed class DesktopSmokeRunner(Application application, string outputD
                 server.Commands.Any(static payload => payload.SequenceEqual(new byte[] { 0x24, 0, 1, 0, 0 })),
                 "Relative mouse selection sends command 0x24.");
 
-            mouseMode.SelectedIndex = 2;
+            RaiseClick(capturedMouse);
             await WaitForAsync(
-                () => status.Text.Contains("捕获鼠标", StringComparison.Ordinal),
+                () => capturedMouse.IsChecked && status.Text.Contains("捕获鼠标", StringComparison.Ordinal),
                 "captured mouse selection",
                 timeout.Token);
             await ActivateViewerAsync(window, videoHost, inputStatus, timeout.Token);
@@ -134,7 +163,9 @@ internal sealed class DesktopSmokeRunner(Application application, string outputD
                     payload.SequenceEqual(new byte[] { 0x05, 1, 0, 0x81, 0x81, 0 })) >= 15,
                 "Relative synchronization sends fifteen source-compatible reports.");
 
-            videoQuality.SelectedValue = (byte)60;
+            var qualityItems = EnumerateMenuItems(videoQuality.ContextMenu).ToArray();
+            var quality60 = qualityItems.Single(item => Equals(item.Tag, "60"));
+            RaiseClick(quality60);
             await WaitForAsync(
                 () => session.CurrentVideoQuality == 60 && videoQuality.IsEnabled,
                 "DQT quality confirmation",
@@ -144,14 +175,16 @@ internal sealed class DesktopSmokeRunner(Application application, string outputD
                     payload.Length >= 5 && payload[0] == 0x27 && payload[2] == 70 && payload[3] == 1),
                 "The DQT selector sends and confirms command 0x27/0x28.");
 
-            colorDepth.SelectedValue = (byte)2;
+            var colorDepthItems = EnumerateMenuItems(colorDepth.ContextMenu).ToArray();
+            var eightBitColor = colorDepthItems.Single(item => Equals(item.Tag, "2"));
+            RaiseClick(eightBitColor);
             await WaitForAsync(
                 () => session.CurrentColorDepth == 2 && colorDepth.IsEnabled,
-                "six-bit color selection",
+                "eight-bit color selection",
                 timeout.Token);
             Check(
                 server.Commands.Any(static payload => payload.SequenceEqual(new byte[] { 0x1B, 1, 2 })),
-                "The color selector sends the six-bit command.");
+                "The color menu sends the eight-bit command.");
 
             var numLock = FindNamed<System.Windows.Shapes.Ellipse>(window, "NumLockIndicator");
             var capsLock = FindNamed<System.Windows.Shapes.Ellipse>(window, "CapsLockIndicator");
@@ -165,13 +198,20 @@ internal sealed class DesktopSmokeRunner(Application application, string outputD
                 HasColor(scrollLock.Fill, Color.FromRgb(240, 198, 116)),
                 "Remote Num/Scroll indicators turn on while Caps remains off.");
             Check(
-                mouseMode.SelectedIndex == 2 && Equals(videoQuality.SelectedValue, (byte)60) &&
-                Equals(colorDepth.SelectedValue, (byte)2),
-                "Mouse, DQT, and color selections are visible in the console.");
+                capturedMouse.IsChecked && quality60.IsChecked && eightBitColor.IsChecked &&
+                mouseMode.ToolTip?.ToString()?.Contains("捕获", StringComparison.Ordinal) == true &&
+                videoQuality.ToolTip?.ToString()?.Contains("60", StringComparison.Ordinal) == true &&
+                colorDepth.ToolTip?.ToString()?.Contains("8-bit", StringComparison.Ordinal) == true,
+                "Mouse, DQT, and color selections remain visible through menu checks and tooltips.");
             await ActivateViewerAsync(window, videoHost, inputStatus, timeout.Token);
             await window.Dispatcher.InvokeAsync(window.UpdateLayout, System.Windows.Threading.DispatcherPriority.Render);
             await Task.Delay(100, timeout.Token);
-            captures.Add(DesktopCapture.Save150Percent(window, outputDirectory, "admin-controls-150.png"));
+            var toolbarCapture = DesktopCapture.Save150Percent(window, outputDirectory, "admin-controls-150.png");
+            captures.Add(toolbarCapture);
+            Check(
+                Math.Abs(toolbarCapture.DpiScaleX - 1.5) < 0.01 &&
+                Math.Abs(toolbarCapture.DpiScaleY - 1.5) < 0.01,
+                "The minimum-width toolbar capture runs at 150% DPI.");
 
             var keyboardItems = EnumerateMenuItems(keyboardButton.ContextMenu).ToArray();
             foreach (var preset in new[] { "CtrlShift", "CtrlEscape", "CtrlAltDelete", "AltTab", "CtrlSpace", "KeyboardReset" })
@@ -236,9 +276,8 @@ internal sealed class DesktopSmokeRunner(Application application, string outputD
                 "The special-key preset always sends its release report.");
 
             Check(
-                mouseMode.SelectedIndex == 2 && Equals(videoQuality.SelectedValue, (byte)60) &&
-                Equals(colorDepth.SelectedValue, (byte)2),
-                "Mouse, DQT, and color selections remain visible after keyboard dialogs.");
+                capturedMouse.IsChecked && quality60.IsChecked && eightBitColor.IsChecked,
+                "Mouse, DQT, and color menu selections remain visible after keyboard dialogs.");
 
             scenarios.Add(new SmokeScenarioEvidence(
                 "admin-controls",
@@ -268,7 +307,7 @@ internal sealed class DesktopSmokeRunner(Application application, string outputD
             var power = FindNamed<Button>(window, "PowerMenuButton");
             var media = FindNamed<Button>(window, "VirtualMediaButton");
             var keyboard = FindNamed<Button>(window, "KeyboardMenuButton");
-            var mouse = FindNamed<ComboBox>(window, "MouseModeComboBox");
+            var mouse = FindNamed<Button>(window, "MouseModeButton");
             Check(!power.IsEnabled, "User privilege disables the unavailable power control.");
             Check(
                 media.IsEnabled && keyboard.IsEnabled && mouse.IsEnabled,

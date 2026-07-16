@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
 using System.Collections.ObjectModel;
@@ -66,7 +67,6 @@ public partial class MainWindow : Window, IDisposable
     private long lastMouseSend;
     private bool fullScreen;
     private bool hasLastMousePosition;
-    private bool applyingVideoSettings;
     private bool applyingBladeSelection;
     private RemoteKeyboardLayout keyboardLayout = RemoteKeyboardLayout.UnitedStates;
     private bool connectionFailed;
@@ -109,24 +109,12 @@ public partial class MainWindow : Window, IDisposable
         ChassisBladeList.ItemsSource = chassisItems;
         BladeTabsList.ItemsSource = bladeTabs;
         session = connectedSession;
-        VideoQualityComboBox.ItemsSource = ConsoleVideoSettings.QualityOptions;
-        ColorDepthComboBox.ItemsSource = connectedSession.Capabilities.ColorDepths
-            .Select(depth => ConsoleVideoSettings.ColorDepthOptions.First(option => option.Value == depth))
-            .ToArray();
-        applyingVideoSettings = true;
-        VideoQualityComboBox.SelectedIndex = ConsoleVideoSettings.FindIndex(
-            ConsoleVideoSettings.QualityOptions,
-            connectedSession.CurrentVideoQuality);
-        ColorDepthComboBox.SelectedValue = connectedSession.CurrentColorDepth;
-        applyingVideoSettings = false;
-        VideoQualityComboBox.IsEnabled = connectedSession.Capabilities.SupportsVideoQuality;
-        ColorDepthComboBox.IsEnabled = connectedSession.Capabilities.ColorDepths.Length > 1;
         sessionSupervisor.ProgressChanged += SessionSupervisor_ProgressChanged;
         pointerState.SetMode(
             connectedSession.CurrentMouseMode == KvmMouseMode.Relative
                 ? ConsolePointerMode.Relative
                 : ConsolePointerMode.Absolute);
-        MouseModeComboBox.SelectedIndex = PointerModeIndex(pointerState.Mode);
+        UpdateConsoleSettingsPresentation(connectedSession);
         ApplyLocalPointerCursor();
         var initialRuntime = AddBladeRuntime(
             initialState,
@@ -338,16 +326,7 @@ public partial class MainWindow : Window, IDisposable
             runtime.Session.CurrentMouseMode == KvmMouseMode.Relative
                 ? ConsolePointerMode.Relative
                 : ConsolePointerMode.Absolute);
-        applyingVideoSettings = true;
-        MouseModeComboBox.SelectedIndex = PointerModeIndex(pointerState.Mode);
-        VideoQualityComboBox.SelectedIndex = ConsoleVideoSettings.FindIndex(
-            ConsoleVideoSettings.QualityOptions,
-            runtime.Session.CurrentVideoQuality);
-        ColorDepthComboBox.ItemsSource = runtime.Session.Capabilities.ColorDepths
-            .Select(depth => ConsoleVideoSettings.ColorDepthOptions.First(option => option.Value == depth))
-            .ToArray();
-        ColorDepthComboBox.SelectedValue = runtime.Session.CurrentColorDepth;
-        applyingVideoSettings = false;
+        UpdateConsoleSettingsPresentation(runtime.Session);
         ApplyLocalPointerCursor();
         ApplySessionPermissions(runtime.Session.Permissions);
         UpdateRemoteLockIndicators(runtime.Session.RemoteLockKeys);
@@ -1061,6 +1040,9 @@ public partial class MainWindow : Window, IDisposable
     }
 
     private void KeyboardMenuButton_Click(object sender, RoutedEventArgs e)
+        => ContextMenuButton_Click(sender, e);
+
+    private void ContextMenuButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is Button button && button.ContextMenu is { } menu)
         {
@@ -1693,13 +1675,7 @@ public partial class MainWindow : Window, IDisposable
     }
 
     private void PowerMenuButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button button && button.ContextMenu is { } menu)
-        {
-            menu.PlacementTarget = button;
-            menu.IsOpen = true;
-        }
-    }
+        => ContextMenuButton_Click(sender, e);
 
     private void HelpButton_Click(object sender, RoutedEventArgs e) =>
         new HelpWindow { Owner = this }.Show();
@@ -1816,22 +1792,23 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
-    private async void MouseModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private async void MouseModeMenuItem_Click(object sender, RoutedEventArgs e)
     {
         var activeSession = session;
-        if (activeSession is null || MouseModeComboBox.SelectedIndex < 0)
+        if (activeSession is null || sender is not MenuItem { Tag: string modeTag })
         {
             return;
         }
 
-        var selectedMode = MouseModeComboBox.SelectedIndex switch
+        var selectedMode = modeTag switch
         {
-            1 => ConsolePointerMode.Relative,
-            2 => ConsolePointerMode.Captured,
+            "Relative" => ConsolePointerMode.Relative,
+            "Captured" => ConsolePointerMode.Captured,
             _ => ConsolePointerMode.Absolute,
         };
         if (pointerState.Mode == selectedMode)
         {
+            UpdateConsoleSettingsPresentation(activeSession);
             return;
         }
 
@@ -1840,7 +1817,7 @@ public partial class MainWindow : Window, IDisposable
             ? KvmMouseMode.Absolute
             : KvmMouseMode.Relative;
 
-        MouseModeComboBox.IsEnabled = false;
+        MouseModeButton.IsEnabled = false;
         try
         {
             await ReleaseRemoteInputAsync();
@@ -1853,6 +1830,7 @@ public partial class MainWindow : Window, IDisposable
             ApplyLocalPointerCursor();
             lastRelativePoint = null;
             hasLastMousePosition = false;
+            UpdateConsoleSettingsPresentation(activeSession);
             SetStatus(
                 selectedMode switch
                 {
@@ -1866,12 +1844,15 @@ public partial class MainWindow : Window, IDisposable
         {
             SetStatus(LocalizationManager.Format("鼠标模式切换失败：{0}", exception.Message), InputFailedBrush);
             pointerState.SetMode(previousMode);
-            MouseModeComboBox.SelectedIndex = PointerModeIndex(previousMode);
+            UpdateConsoleSettingsPresentation(activeSession);
             ApplyLocalPointerCursor();
         }
         finally
         {
-            MouseModeComboBox.IsEnabled = activeSession.Permissions.CanControlKvm;
+            if (ReferenceEquals(session, activeSession))
+            {
+                ApplySessionPermissions(activeSession.Permissions);
+            }
         }
     }
 
@@ -1952,55 +1933,131 @@ public partial class MainWindow : Window, IDisposable
     private void ApplyLocalPointerCursor() =>
         VideoHost.Cursor = pointerState.IsLocalPointerVisible ? Cursors.Arrow : Cursors.None;
 
-    private static int PointerModeIndex(ConsolePointerMode mode) => mode switch
+    private void UpdateConsoleSettingsPresentation(KvmClientSession sourceSession)
     {
-        ConsolePointerMode.Relative => 1,
-        ConsolePointerMode.Captured => 2,
-        _ => 0,
-    };
+        var mouseModeTag = pointerState.Mode.ToString();
+        var mouseModeLabel = pointerState.Mode switch
+        {
+            ConsolePointerMode.Relative => LocalizationManager.Translate("相对"),
+            ConsolePointerMode.Captured => LocalizationManager.Translate("捕获"),
+            _ => LocalizationManager.Translate("绝对"),
+        };
+        UpdateMenuSelection(MouseModeButton.ContextMenu, mouseModeTag);
+        MouseModeButton.ToolTip = FormatSettingToolTip("鼠标模式", mouseModeLabel);
 
-    private async void VideoQualityComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        var qualityOptions = ConsoleVideoSettings.QualityOptions;
+        var qualityIndex = ConsoleVideoSettings.FindIndex(qualityOptions, sourceSession.CurrentVideoQuality);
+        var qualityLabel = qualityIndex >= 0
+            ? qualityOptions[qualityIndex].Label
+            : sourceSession.CurrentVideoQuality.ToString(CultureInfo.InvariantCulture);
+        UpdateMenuSelection(
+            VideoQualityButton.ContextMenu,
+            sourceSession.CurrentVideoQuality.ToString(CultureInfo.InvariantCulture));
+        VideoQualityButton.ToolTip = FormatSettingToolTip("图像清晰度", qualityLabel);
+
+        var depthOption = ConsoleVideoSettings.ColorDepthOptions.FirstOrDefault(
+            option => option.Value == sourceSession.CurrentColorDepth);
+        var depthLabel = string.IsNullOrEmpty(depthOption.Label)
+            ? sourceSession.CurrentColorDepth.ToString(CultureInfo.InvariantCulture)
+            : depthOption.Label;
+        UpdateMenuSelection(
+            ColorDepthButton.ContextMenu,
+            sourceSession.CurrentColorDepth.ToString(CultureInfo.InvariantCulture),
+            tag => byte.TryParse(tag, out var depth) && sourceSession.Capabilities.ColorDepths.Contains(depth));
+        ColorDepthButton.ToolTip = FormatSettingToolTip("颜色位数", depthLabel);
+    }
+
+    private static void UpdateMenuSelection(
+        ContextMenu? menu,
+        string selectedTag,
+        Func<string, bool>? isEnabled = null)
     {
-        if (applyingVideoSettings || session is null || VideoQualityComboBox.SelectedValue is not byte quality)
+        if (menu is null)
+        {
+            return;
+        }
+
+        foreach (var item in menu.Items.OfType<MenuItem>())
+        {
+            var tag = item.Tag as string ?? string.Empty;
+            item.IsChecked = string.Equals(tag, selectedTag, StringComparison.Ordinal);
+            if (isEnabled is not null)
+            {
+                item.IsEnabled = isEnabled(tag);
+            }
+        }
+    }
+
+    private static string FormatSettingToolTip(string setting, string value) =>
+        $"{LocalizationManager.Translate(setting)}：{value}";
+
+    private async void VideoQualityMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (session is null || sender is not MenuItem { Tag: string qualityTag } ||
+            !byte.TryParse(qualityTag, out var quality))
         {
             return;
         }
 
         var activeSession = session;
-        VideoQualityComboBox.IsEnabled = false;
+        if (activeSession.CurrentVideoQuality == quality)
+        {
+            UpdateConsoleSettingsPresentation(activeSession);
+            return;
+        }
+
+        VideoQualityButton.IsEnabled = false;
         try
         {
             await activeSession.SetVideoQualityAsync(quality, committed: true);
+            if (ReferenceEquals(session, activeSession))
+            {
+                UpdateConsoleSettingsPresentation(activeSession);
+            }
+
             SetStatus(LocalizationManager.Format("图像清晰度已设为 {0}", quality), InputReadyBrush);
         }
         catch (Exception exception)
         {
             SetStatus(LocalizationManager.Format("图像清晰度设置失败：{0}", exception.Message), InputFailedBrush);
-            applyingVideoSettings = true;
-            VideoQualityComboBox.SelectedIndex = ConsoleVideoSettings.FindIndex(
-                ConsoleVideoSettings.QualityOptions,
-                activeSession.CurrentVideoQuality);
-            applyingVideoSettings = false;
+            if (ReferenceEquals(session, activeSession))
+            {
+                UpdateConsoleSettingsPresentation(activeSession);
+            }
         }
         finally
         {
-            VideoQualityComboBox.IsEnabled = activeSession.Permissions.CanControlKvm &&
-                                             activeSession.Capabilities.SupportsVideoQuality;
+            if (ReferenceEquals(session, activeSession))
+            {
+                ApplySessionPermissions(activeSession.Permissions);
+            }
         }
     }
 
-    private async void ColorDepthComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private async void ColorDepthMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        if (applyingVideoSettings || session is null || ColorDepthComboBox.SelectedValue is not byte depth)
+        if (session is null || sender is not MenuItem { Tag: string depthTag } ||
+            !byte.TryParse(depthTag, out var depth))
         {
             return;
         }
 
         var activeSession = session;
-        ColorDepthComboBox.IsEnabled = false;
+        if (!activeSession.Capabilities.ColorDepths.Contains(depth) || activeSession.CurrentColorDepth == depth)
+        {
+            UpdateConsoleSettingsPresentation(activeSession);
+            return;
+        }
+
+        ColorDepthButton.IsEnabled = false;
         try
         {
             await activeSession.SetColorDepthAsync(depth);
+            if (ReferenceEquals(session, activeSession))
+            {
+                UpdateConsoleSettingsPresentation(activeSession);
+            }
+
             SetStatus(
                 LocalizationManager.Format(
                     "颜色位数已设为 {0}",
@@ -2010,14 +2067,17 @@ public partial class MainWindow : Window, IDisposable
         catch (Exception exception)
         {
             SetStatus(LocalizationManager.Format("颜色位数设置失败：{0}", exception.Message), InputFailedBrush);
-            applyingVideoSettings = true;
-            ColorDepthComboBox.SelectedValue = activeSession.CurrentColorDepth;
-            applyingVideoSettings = false;
+            if (ReferenceEquals(session, activeSession))
+            {
+                UpdateConsoleSettingsPresentation(activeSession);
+            }
         }
         finally
         {
-            ColorDepthComboBox.IsEnabled = activeSession.Permissions.CanControlKvm &&
-                                           activeSession.Capabilities.ColorDepths.Length > 1;
+            if (ReferenceEquals(session, activeSession))
+            {
+                ApplySessionPermissions(activeSession.Permissions);
+            }
         }
     }
 
@@ -2035,12 +2095,7 @@ public partial class MainWindow : Window, IDisposable
                 return;
             }
 
-            applyingVideoSettings = true;
-            VideoQualityComboBox.SelectedIndex = ConsoleVideoSettings.FindIndex(
-                ConsoleVideoSettings.QualityOptions,
-                changedSession.CurrentVideoQuality);
-            ColorDepthComboBox.SelectedValue = changedSession.CurrentColorDepth;
-            applyingVideoSettings = false;
+            UpdateConsoleSettingsPresentation(changedSession);
         });
     }
 
@@ -2127,11 +2182,11 @@ public partial class MainWindow : Window, IDisposable
         }
 
         var availability = ConsolePermissionUiRules.Resolve(permissions, session.Capabilities);
-        MouseModeComboBox.IsEnabled = availability.MouseMode;
+        MouseModeButton.IsEnabled = availability.MouseMode;
         ShowLocalPointerButton.IsEnabled = availability.Input;
         SynchronizeMouseButton.IsEnabled = availability.Input;
-        VideoQualityComboBox.IsEnabled = availability.VideoQuality;
-        ColorDepthComboBox.IsEnabled = availability.ColorDepth;
+        VideoQualityButton.IsEnabled = availability.VideoQuality;
+        ColorDepthButton.IsEnabled = availability.ColorDepth;
         RecordButton.IsEnabled = availability.Recording;
         KeyboardMenuButton.IsEnabled = availability.Keyboard;
         ReleaseKeysButton.IsEnabled = availability.Keyboard;
