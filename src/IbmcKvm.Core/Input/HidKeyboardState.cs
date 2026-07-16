@@ -63,15 +63,6 @@ public sealed class HidKeyboardState
         return report;
     }
 
-    public byte[] CreateKeyPressReport(byte usage)
-    {
-        ValidateUsage(usage);
-        var report = new byte[8];
-        report[0] = (byte)Modifiers;
-        report[2] = usage;
-        return report;
-    }
-
     public byte[] Clear()
     {
         pressed.Clear();

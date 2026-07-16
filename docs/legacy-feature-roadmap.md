@@ -147,11 +147,8 @@ Implementation status (2026-07-16): all original presets, a bounded six-usage
 custom editor, guaranteed release reports, focused-viewer US/Japanese/French
 mapping, `0x04` lock-state processing, and N/C/S indicators are implemented.
 Caps/Num/Scroll input now re-queries the remote state after the HID toggle so the
-indicators do not remain at their connection-time values. Ordinary KeyDown input
-uses the original client's transient non-modifier slots: fast overlapping letters
-remain isolated instead of repeating an older character, while repeated KeyDown
-events preserve long-press input. Core, loopback, and 150% DPI desktop tests cover
-the mappings, exact fast/repeat/modifier reports, refreshed indicators, all
+indicators do not remain at their connection-time values. Core, loopback, and
+150% DPI desktop tests cover the mappings, reports, refreshed indicators, all
 presets, layout switching, release reports, and six visible custom-key slots;
 authorized hardware inspection remains pending.
 
@@ -227,14 +224,14 @@ windows passed 150% DPI UI Automation and screenshot inspection.
 ## Current software verification baseline
 
 - Release build: 0 warnings, 0 errors.
-- Protocol tests: 166 passed; Core tests: 123 passed; App tests: 90 passed;
-  total 379 passed.
-- Local-only desktop smoke: 67 checks across four real WPF scenarios at 150%
+- Protocol tests: 166 passed; Core tests: 122 passed; App tests: 90 passed;
+  total 378 passed.
+- Local-only desktop smoke: 64 checks across four real WPF scenarios at 150%
   DPI, including the single-row icon toolbar at minimum width, Caps/Num HID
-  reports and refreshed remote lock indicators, isolated fast typing, long-press
-  repeat, modifier retention, capture/Esc release, DQT/color wire commands, six
-  custom-key slots, privilege-aware controls, graceful-EOF recovery, progress,
-  success, and retry exhaustion. No power or USB-reset command is emitted.
+  reports and refreshed remote lock indicators, capture/Esc release, DQT/color
+  wire commands, six custom-key slots, privilege-aware controls, graceful-EOF
+  recovery, progress, success, and retry exhaustion. No power or USB-reset
+  command is emitted.
 - Four-language desktop verification: 48 checks at 150% DPI, with no
   untranslated user-visible text, interactive-control overflow, or trust-header
   overlap.

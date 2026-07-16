@@ -222,63 +222,6 @@ internal sealed class DesktopSmokeRunner(Application application, string outputD
                 server.Commands.Count(static payload => payload.SequenceEqual(new byte[] { 0x04, 1, 1 })) >= 3,
                 "Each lock-key toggle re-queries the remote lock state.");
 
-            var keyboardCommandCount = server.Commands.Count(static payload => payload[0] == 0x03);
-            RaiseRemoteKeyDown(videoHost, Key.A);
-            RaiseRemoteKeyDown(videoHost, Key.B);
-            RaiseRemoteKeyUp(videoHost, Key.A);
-            RaiseRemoteKeyUp(videoHost, Key.B);
-            await WaitForAsync(
-                () => server.Commands.Count(static payload => payload[0] == 0x03) >= keyboardCommandCount + 4,
-                "four fast-overlap keyboard reports",
-                timeout.Token);
-            var fastReports = server.Commands
-                .Where(static payload => payload[0] == 0x03)
-                .Skip(keyboardCommandCount)
-                .Take(4)
-                .ToArray();
-            keyboardCommandCount += 4;
-            RaiseRemoteKeyDown(videoHost, Key.C);
-            RaiseRemoteKeyDown(videoHost, Key.C);
-            RaiseRemoteKeyDown(videoHost, Key.C);
-            RaiseRemoteKeyUp(videoHost, Key.C);
-            await Task.Delay(200, timeout.Token);
-            var repeatReports = server.Commands
-                .Where(static payload => payload[0] == 0x03)
-                .Skip(keyboardCommandCount)
-                .ToArray();
-            Check(
-                repeatReports.Length == 4 && repeatReports.Take(3).All(static payload =>
-                    payload.SequenceEqual(new byte[] { 0x03, 1, 0, 0, 0x06, 0, 0, 0, 0, 0 })) &&
-                repeatReports[3].SequenceEqual(new byte[] { 0x03, 1, 0, 0, 0, 0, 0, 0, 0, 0 }),
-                "Repeated KeyDown events preserve remote long-press input until KeyUp.");
-            Check(
-                fastReports[0].SequenceEqual(new byte[] { 0x03, 1, 0, 0, 0x04, 0, 0, 0, 0, 0 }) &&
-                fastReports[1].SequenceEqual(new byte[] { 0x03, 1, 0, 0, 0x05, 0, 0, 0, 0, 0 }) &&
-                fastReports[2].SequenceEqual(new byte[] { 0x03, 1, 0, 0, 0, 0, 0, 0, 0, 0 }) &&
-                fastReports[3].SequenceEqual(new byte[] { 0x03, 1, 0, 0, 0, 0, 0, 0, 0, 0 }),
-                "Fast overlapping letters send isolated reports without repeating the older character.");
-
-            keyboardCommandCount += 4;
-            RaiseRemoteKeyDown(videoHost, Key.LeftShift);
-            RaiseRemoteKeyDown(videoHost, Key.A);
-            RaiseRemoteKeyUp(videoHost, Key.A);
-            RaiseRemoteKeyUp(videoHost, Key.LeftShift);
-            await WaitForAsync(
-                () => server.Commands.Count(static payload => payload[0] == 0x03) >= keyboardCommandCount + 4,
-                "four modifier-preserving keyboard reports",
-                timeout.Token);
-            var modifiedReports = server.Commands
-                .Where(static payload => payload[0] == 0x03)
-                .Skip(keyboardCommandCount)
-                .Take(4)
-                .ToArray();
-            Check(
-                modifiedReports[0].SequenceEqual(new byte[] { 0x03, 1, 2, 0, 0, 0, 0, 0, 0, 0 }) &&
-                modifiedReports[1].SequenceEqual(new byte[] { 0x03, 1, 2, 0, 0x04, 0, 0, 0, 0, 0 }) &&
-                modifiedReports[2].SequenceEqual(new byte[] { 0x03, 1, 2, 0, 0, 0, 0, 0, 0, 0 }) &&
-                modifiedReports[3].SequenceEqual(new byte[] { 0x03, 1, 0, 0, 0, 0, 0, 0, 0, 0 }),
-                "Physical modifier state remains held around transient character reports.");
-
             Check(
                 capturedMouse.IsChecked && quality60.IsChecked && eightBitColor.IsChecked &&
                 mouseMode.ToolTip?.ToString()?.Contains("捕获", StringComparison.Ordinal) == true &&
@@ -624,23 +567,15 @@ internal sealed class DesktopSmokeRunner(Application application, string outputD
 
     private static void RaiseRemoteKey(UIElement target, Key key)
     {
-        RaiseRemoteKeyDown(target, key);
-        RaiseRemoteKeyUp(target, key);
-    }
-
-    private static void RaiseRemoteKeyDown(UIElement target, Key key) =>
-        RaiseRemoteKeyEvent(target, key, Keyboard.PreviewKeyDownEvent);
-
-    private static void RaiseRemoteKeyUp(UIElement target, Key key) =>
-        RaiseRemoteKeyEvent(target, key, Keyboard.PreviewKeyUpEvent);
-
-    private static void RaiseRemoteKeyEvent(UIElement target, Key key, RoutedEvent routedEvent)
-    {
         var source = PresentationSource.FromVisual(target) ??
                      throw new InvalidOperationException("The remote viewer does not have a presentation source.");
         target.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, source, Environment.TickCount, key)
         {
-            RoutedEvent = routedEvent,
+            RoutedEvent = Keyboard.PreviewKeyDownEvent,
+        });
+        target.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, source, Environment.TickCount, key)
+        {
+            RoutedEvent = Keyboard.PreviewKeyUpEvent,
         });
     }
 

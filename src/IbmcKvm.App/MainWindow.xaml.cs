@@ -696,34 +696,18 @@ public partial class MainWindow : Window, IDisposable
 
         var virtualKey = GetVirtualKey(e);
         var activeSession = session;
-        if (WindowsVirtualKeyMap.TryGetModifier(virtualKey, out var modifier))
+        var changed = WindowsVirtualKeyMap.TryGetModifier(virtualKey, out var modifier)
+            ? keyboard.SetModifier(modifier, pressed: true)
+            : TryPressMappedKey(virtualKey);
+        if (changed)
         {
-            if (keyboard.SetModifier(modifier, pressed: true))
+            e.Handled = true;
+            await SendKeyboardSafelyAsync(keyboard.CreateReport());
+            if (activeSession is not null && WindowsVirtualKeyMap.IsLockKey(virtualKey))
             {
-                e.Handled = true;
-                await SendKeyboardSafelyAsync(keyboard.CreateReport());
+                var cancellationToken = activeRuntime?.Lifetime.Token ?? CancellationToken.None;
+                _ = RefreshRemoteLockKeysAfterInputAsync(activeSession, cancellationToken);
             }
-
-            return;
-        }
-
-        if (!TryMapKey(virtualKey, out var usage))
-        {
-            return;
-        }
-
-        var isRepeated = !pressedVirtualKeys.TryAdd(virtualKey, usage);
-        e.Handled = true;
-        if (isRepeated && WindowsVirtualKeyMap.IsLockKey(virtualKey))
-        {
-            return;
-        }
-
-        await SendKeyboardSafelyAsync(keyboard.CreateKeyPressReport(usage));
-        if (activeSession is not null && WindowsVirtualKeyMap.IsLockKey(virtualKey))
-        {
-            var cancellationToken = activeRuntime?.Lifetime.Token ?? CancellationToken.None;
-            _ = RefreshRemoteLockKeysAfterInputAsync(activeSession, cancellationToken);
         }
     }
 
@@ -737,7 +721,7 @@ public partial class MainWindow : Window, IDisposable
         var virtualKey = GetVirtualKey(e);
         var changed = WindowsVirtualKeyMap.TryGetModifier(virtualKey, out var modifier)
             ? keyboard.SetModifier(modifier, pressed: false)
-            : pressedVirtualKeys.Remove(virtualKey);
+            : pressedVirtualKeys.Remove(virtualKey, out var usage) && keyboard.Release(usage);
         if (changed)
         {
             e.Handled = true;
@@ -1044,13 +1028,21 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
-    private bool TryMapKey(int virtualKey, out byte usage)
+    private bool TryPressMappedKey(int virtualKey)
     {
-        return WindowsVirtualKeyMap.TryGetUsage(
-            virtualKey,
-            keyboardLayout,
-            Keyboard.Modifiers.HasFlag(ModifierKeys.Shift),
-            out usage);
+        if (pressedVirtualKeys.ContainsKey(virtualKey) ||
+            !WindowsVirtualKeyMap.TryGetUsage(
+                virtualKey,
+                keyboardLayout,
+                Keyboard.Modifiers.HasFlag(ModifierKeys.Shift),
+                out var usage) ||
+            !keyboard.Press(usage))
+        {
+            return false;
+        }
+
+        pressedVirtualKeys.Add(virtualKey, usage);
+        return true;
     }
 
     private void KeyboardMenuButton_Click(object sender, RoutedEventArgs e)

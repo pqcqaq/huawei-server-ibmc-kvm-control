@@ -32,21 +32,6 @@ public sealed class HidKeyboardStateTests
     }
 
     [Fact]
-    public void BuildsSourceCompatibleTransientKeyPressWithoutAccumulatingHeldCharacters()
-    {
-        var state = new HidKeyboardState();
-        state.SetModifier(HidModifiers.LeftShift, true);
-        state.Press(0x04);
-
-        Assert.Equal(
-            new byte[] { 2, 0, 5, 0, 0, 0, 0, 0 },
-            state.CreateKeyPressReport(0x05));
-        Assert.Equal(
-            new byte[] { 2, 0, 4, 0, 0, 0, 0, 0 },
-            state.CreateReport());
-    }
-
-    [Fact]
     public void ClearReleasesEveryKeyAndModifier()
     {
         var state = new HidKeyboardState();
