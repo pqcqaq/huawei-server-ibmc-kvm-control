@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Buffers.Binary;
 using System.Runtime.InteropServices;
+using IbmcKvm.Core.Agent;
 using IbmcKvm.Core.Input;
 using IbmcKvm.Core.Session;
 using IbmcKvm.Core.Video;
@@ -14,6 +15,17 @@ internal static class Program
 {
     public static async Task<int> Main(string[] args)
     {
+        if (GetOption(args, "--agent-host=") is { } agentHost)
+        {
+            return await RunAgentSmokeAsync(
+                agentHost,
+                GetOption(args, "--agent-fingerprint=") ?? string.Empty,
+                string.Equals(
+                    GetOption(args, "--agent-input-test="),
+                    "true",
+                    StringComparison.OrdinalIgnoreCase));
+        }
+
         if (GetOption(args, "--rep=") is { } repPath)
         {
             return await ReplayRepAsync(
@@ -60,6 +72,65 @@ internal static class Program
 
         await WriteStateAsync(statePath, server, failureTriggered);
         return 0;
+    }
+
+    private static async Task<int> RunAgentSmokeAsync(
+        string endpointValue,
+        string fingerprint,
+        bool testInput)
+    {
+        if (string.IsNullOrWhiteSpace(fingerprint))
+        {
+            Console.Error.WriteLine("--agent-fingerprint is required.");
+            return 2;
+        }
+        var token = await Console.In.ReadLineAsync() ?? string.Empty;
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        try
+        {
+            var endpoint = AgentEndpoint.Parse(endpointValue);
+            await using var session = await AgentClientSession.ConnectAsync(
+                new AgentConnectionOptions(endpoint.Host, endpoint.Port, token, fingerprint),
+                timeout.Token);
+            await using var frames = session.ReadFramesAsync(timeout.Token).GetAsyncEnumerator(timeout.Token);
+            if (!await frames.MoveNextAsync())
+            {
+                Console.Error.WriteLine("AGENT_FAILED no-frame");
+                return 3;
+            }
+            var decoded = new AgentFrameDecoder().Decode(frames.Current);
+            if (testInput)
+            {
+                await SendAgentInputTestAsync(session, timeout.Token);
+            }
+            Console.WriteLine(
+                $"AGENT_OK sequence={decoded.Sequence} width={decoded.Width} height={decoded.Height} " +
+                $"tiles={frames.Current.Tiles.Count} input={testInput}");
+            return 0;
+        }
+        catch (Exception exception)
+        {
+            Console.Error.WriteLine($"AGENT_FAILED {exception.GetType().Name}: {exception.Message}");
+            return 3;
+        }
+    }
+
+    private static async Task SendAgentInputTestAsync(
+        AgentClientSession session,
+        CancellationToken cancellationToken)
+    {
+        byte[] usages = [0x04, 0x0A, 0x08, 0x11, 0x17, 0x17, 0x08, 0x16, 0x17, 0x28];
+        foreach (var usage in usages)
+        {
+            await session.SendKeyboardAsync(
+                new byte[] { 0, 0, usage, 0, 0, 0, 0, 0 },
+                cancellationToken);
+            await session.SendKeyboardAsync(new byte[8], cancellationToken);
+        }
+        await Task.Delay(100, cancellationToken);
+        await session.SendMouseAsync(0, 49_151, 32_767, 0, cancellationToken);
+        await session.SendMouseAsync(1, 49_151, 32_767, 0, cancellationToken);
+        await session.SendMouseAsync(0, 49_151, 32_767, 0, cancellationToken);
     }
 
     private static async Task<int> ReplayRepAsync(string repPath, string? frameValue, string? ppmPath)

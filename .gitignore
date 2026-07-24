@@ -6,6 +6,8 @@ TestResults/
 artifacts/
 .artifacts/
 publish/
+agent/target/
+agent/config/
 __pycache__/
 *.py[cod]
 *.user

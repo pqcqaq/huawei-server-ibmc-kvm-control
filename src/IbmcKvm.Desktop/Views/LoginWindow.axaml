@@ -1,9 +1,9 @@
 <Window x:Class="IbmcKvm.Desktop.Views.LoginWindow"
         xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="连接 iBMC"
-        Width="520" Height="690" MinWidth="520" MinHeight="690"
-        MaxWidth="520" MaxHeight="690" CanResize="False"
+        Title="连接远程控制台"
+        Width="520" Height="760" MinWidth="520" MinHeight="760"
+        MaxWidth="520" MaxHeight="760" CanResize="False"
         WindowStartupLocation="CenterScreen"
         Icon="avares://IbmcKvm.Desktop/Assets/IbmcKvm.ico">
   <Grid RowDefinitions="142,*">
@@ -20,7 +20,7 @@
               <TextBlock Text="远程控制台" Foreground="#9DABA4" FontSize="11" Margin="0,2,0,0" />
             </StackPanel>
           </StackPanel>
-          <TextBlock Text="连接服务器后将自动进入全屏控制界面"
+          <TextBlock Text="连接 iBMC 或 Linux Agent 后进入远程控制界面"
                      Foreground="#B9C5BF" FontSize="11" Margin="1,18,0,0" />
         </StackPanel>
 
@@ -41,18 +41,27 @@
     </Border>
 
     <Grid Grid.Row="1" Margin="42,24,42,28">
-      <Grid x:Name="ConnectionForm" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
-        <TextBlock Grid.Row="0" Text="iBMC 地址" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,0,0,5" />
-        <TextBox Grid.Row="1" x:Name="AddressTextBox" AutomationProperties.AutomationId="AddressTextBox"
+      <Grid x:Name="ConnectionForm" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+        <TextBlock Grid.Row="0" Text="目标类型" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,0,0,5" />
+        <ComboBox Grid.Row="1" x:Name="TargetTypeComboBox" SelectedIndex="0"
+                  SelectionChanged="TargetTypeComboBox_SelectionChanged"
+                  AutomationProperties.AutomationId="TargetTypeComboBox">
+          <ComboBoxItem Content="Huawei iBMC" Tag="Ibmc" />
+          <ComboBoxItem Content="Linux Agent" Tag="LinuxAgent" />
+        </ComboBox>
+
+        <TextBlock Grid.Row="2" x:Name="AddressLabel" Text="iBMC 地址"
+                   Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,12,0,5" />
+        <TextBox Grid.Row="3" x:Name="AddressTextBox" AutomationProperties.AutomationId="AddressTextBox"
                  Watermark="主机名、IP 或 https://地址:端口" />
 
-        <Grid Grid.Row="2" ColumnDefinitions="*,14,*" Margin="0,12,0,0">
-          <StackPanel Grid.Column="0">
+        <Grid Grid.Row="4" x:Name="CredentialsGrid" ColumnDefinitions="*,14,*" Margin="0,12,0,0">
+          <StackPanel Grid.Column="0" x:Name="UserNamePanel">
             <TextBlock Text="用户名" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,0,0,5" />
             <TextBox x:Name="UserNameTextBox" AutomationProperties.AutomationId="UserNameTextBox" />
           </StackPanel>
-          <StackPanel Grid.Column="2">
-            <TextBlock Text="密码" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,0,0,5" />
+          <StackPanel Grid.Column="2" x:Name="PasswordPanel">
+            <TextBlock x:Name="PasswordLabel" Text="密码" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,0,0,5" />
             <Grid>
               <TextBox x:Name="PasswordInput" AutomationProperties.AutomationId="PasswordInput"
                        PasswordChar="●" Padding="8,5,38,5" />
@@ -66,33 +75,33 @@
           </StackPanel>
         </Grid>
 
-        <TextBlock Grid.Row="3" Text="会话模式" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,12,0,5" />
-        <ComboBox Grid.Row="4" x:Name="ModeComboBox" SelectedIndex="0" AutomationProperties.AutomationId="ModeComboBox">
+        <TextBlock Grid.Row="5" x:Name="ModeLabel" Text="会话模式" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,12,0,5" />
+        <ComboBox Grid.Row="6" x:Name="ModeComboBox" SelectedIndex="0" AutomationProperties.AutomationId="ModeComboBox">
           <ComboBoxItem Content="共享控制" Tag="Shared" />
           <ComboBoxItem Content="独占控制" Tag="Exclusive" />
         </ComboBox>
 
-        <CheckBox Grid.Row="5" x:Name="TrustCheckBox" Margin="0,14,0,0"
-                  VerticalContentAlignment="Center" Content="本次会话信任自签名证书" FontSize="12" />
-        <TextBlock Grid.Row="6" Text="连接前显示服务器证书 SHA-256 指纹，由你确认后再发送凭据。"
+        <CheckBox Grid.Row="7" x:Name="TrustCheckBox" Margin="0,14,0,0"
+                   VerticalContentAlignment="Center" Content="本次会话信任自签名证书" FontSize="12" />
+        <TextBlock Grid.Row="8" x:Name="CertificateHintText" Text="连接前显示服务器证书 SHA-256 指纹，由你确认后再发送凭据。"
                    Foreground="{StaticResource MutedBrush}" FontSize="10" TextWrapping="Wrap" Margin="22,4,0,0" />
 
-        <Grid Grid.Row="7" ColumnDefinitions="*,Auto" Margin="0,14,0,0">
+        <Grid Grid.Row="9" ColumnDefinitions="*,Auto" Margin="0,14,0,0">
           <CheckBox x:Name="RememberSettingsCheckBox" VerticalContentAlignment="Center"
                     Content="加密记住此连接" FontSize="12" Unchecked="RememberSettingsCheckBox_Unchecked" />
           <Button Grid.Column="1" x:Name="ClearSavedSettingsButton" Content="清除"
                   Height="28" MinHeight="28" Padding="10,3" Click="ClearSavedSettingsButton_Click" />
         </Grid>
-        <TextBlock Grid.Row="8" Text="连接成功后，凭据使用当前桌面用户的安全密钥环加密并仅保存在本机。"
+        <TextBlock Grid.Row="10" Text="连接成功后，凭据使用当前桌面用户的安全密钥环加密并仅保存在本机。"
                    Foreground="{StaticResource MutedBrush}" FontSize="10" TextWrapping="Wrap" Margin="22,4,0,0" />
 
-        <Border Grid.Row="9" x:Name="LoginErrorBorder" IsVisible="False"
+        <Border Grid.Row="11" x:Name="LoginErrorBorder" IsVisible="False"
                 Background="#F8E9E7" BorderBrush="#D9A49F" BorderThickness="1"
                 CornerRadius="3" Padding="10,8" Margin="0,14,0,0">
           <TextBlock x:Name="LoginErrorText" Foreground="#A33830" FontSize="11" TextWrapping="Wrap" />
         </Border>
 
-        <Button Grid.Row="10" x:Name="ConnectButton" Content="连接远程控制台"
+        <Button Grid.Row="12" x:Name="ConnectButton" Content="连接远程控制台"
                 Classes="primary" Height="40" Margin="0,18,0,0"
                 HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
                 IsDefault="True" AutomationProperties.AutomationId="ConnectButton"

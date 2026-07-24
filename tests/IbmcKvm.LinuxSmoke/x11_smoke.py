@@ -33,7 +33,7 @@ def main() -> int:
     if len(sys.argv) < 4 or len(sys.argv) > 8:
         raise SystemExit(
             "usage: x11_smoke.py WINDOW_ID CENTER_X CENTER_Y "
-            "[KEYSYM[,KEYSYM...]] [--ctrl] [--alt] [--keyboard-only] [--pointer-only]"
+            "[KEYSYM[,KEYSYM...]] [--ctrl] [--alt] [--keyboard-only] [--pointer-only] [--focus-only]"
         )
 
     window = int(sys.argv[1], 0)
@@ -45,6 +45,7 @@ def main() -> int:
     use_alt = "--alt" in options
     keyboard_only = "--keyboard-only" in options
     pointer_only = "--pointer-only" in options
+    focus_only = "--focus-only" in options
     x11 = ctypes.CDLL("libX11.so.6")
     xtst = ctypes.CDLL("libXtst.so.6")
     x11.XOpenDisplay.restype = ctypes.c_void_p
@@ -123,6 +124,8 @@ def main() -> int:
         x11.XSetInputFocus(display, ctypes.c_ulong(window), 1, 0)
         x11.XFlush(display)
         time.sleep(0.1)
+        if focus_only:
+            return 0
         if not keyboard_only:
             xtst.XTestFakeMotionEvent(display, -1, center_x, center_y, 0)
             xtst.XTestFakeButtonEvent(display, 1, True, 0)

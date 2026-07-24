@@ -65,6 +65,25 @@ public sealed class EncryptedSettingsStoreTests : IDisposable
         Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, mode);
     }
 
+    [Fact]
+    public async Task RoundTripsLinuxAgentWithoutUserName()
+    {
+        var path = Path.Combine(directory, "agent-settings.bin");
+        var store = new EncryptedSettingsStore(new MemorySecretStore(), path);
+        var expected = new ConnectionSettings(
+            "agent.example:7443",
+            string.Empty,
+            Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
+            ConnectionMode.Shared,
+            TrustSelfSignedCertificate: true,
+            RememberSettings: true,
+            ConnectionTargetKind.LinuxAgent);
+
+        await store.SaveAsync(expected);
+
+        Assert.Equal(expected, await store.LoadAsync());
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(directory))

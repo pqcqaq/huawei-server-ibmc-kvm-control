@@ -1,0 +1,80 @@
+<Window x:Class="IbmcKvm.Desktop.Views.AgentConsoleWindow"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Linux Agent Remote Console" Width="1280" Height="800" MinWidth="900" MinHeight="520"
+        WindowStartupLocation="CenterScreen" Background="#090B0A"
+        Icon="avares://IbmcKvm.Desktop/Assets/IbmcKvm.ico">
+  <Grid Background="#090B0A">
+    <Border x:Name="VideoHost" Background="#050706" Focusable="True"
+            PointerEntered="VideoHost_PointerEntered"
+            PointerPressed="VideoHost_PointerPressed" PointerReleased="VideoHost_PointerReleased"
+            PointerMoved="VideoHost_PointerMoved" PointerWheelChanged="VideoHost_PointerWheelChanged"
+            LostFocus="VideoHost_LostFocus">
+      <Grid>
+        <Image x:Name="RemoteImage" Stretch="Uniform" />
+
+        <Border x:Name="ViewerOverlay" Background="#F2090B0A" IsHitTestVisible="False">
+          <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+            <ProgressBar IsIndeterminate="True" Width="180" Height="4" />
+            <TextBlock x:Name="OverlayText" Text="正在等待 Linux Agent 画面"
+                       FontWeight="SemiBold" FontSize="18" Foreground="#DCE4E0"
+                       HorizontalAlignment="Center" Margin="0,14,0,0" />
+            <TextBlock x:Name="ConnectedEndpointText" Foreground="#7F8D86" FontSize="11"
+                       HorizontalAlignment="Center" Margin="0,6,0,0" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="statusPill" HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                Margin="12" IsHitTestVisible="False">
+          <StackPanel Orientation="Horizontal">
+            <Ellipse x:Name="InputStatusDot" Width="9" Height="9" Fill="#77827D" Margin="0,0,7,0" />
+            <TextBlock x:Name="InputStatusText" Text="已连接，等待视频" VerticalAlignment="Center"
+                       Foreground="#E1E8E4" FontSize="10" MaxWidth="260" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="statusPill" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                Margin="12" IsHitTestVisible="False">
+          <TextBlock x:Name="VideoMetricsText" Text="无视频信号" Foreground="#DDE5E1" FontSize="10"
+                     MaxWidth="200" TextTrimming="CharacterEllipsis" />
+        </Border>
+
+        <Border x:Name="StatusMessageBorder" HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                Margin="0,11,0,11" Background="#E8193028" BorderBrush="#159B65"
+                BorderThickness="1" CornerRadius="4" Padding="38,7" IsHitTestVisible="False">
+          <TextBlock x:Name="StatusMessageText" Text="Linux Agent 已连接" Foreground="#E8EFEB" FontSize="10"
+                     MaxWidth="360" TextTrimming="CharacterEllipsis" />
+        </Border>
+      </Grid>
+    </Border>
+
+    <Border HorizontalAlignment="Center" VerticalAlignment="Top"
+            Margin="0,14,0,0" Padding="5" Background="{StaticResource ToolbarBrush}"
+            BorderBrush="{StaticResource ToolbarLineBrush}" BorderThickness="1" CornerRadius="4"
+            ZIndex="30">
+      <StackPanel Orientation="Horizontal">
+        <ToggleButton x:Name="ShowLocalPointerButton" Classes="tool" IsChecked="True"
+                      Click="ShowLocalPointerButton_Click" ToolTip.Tip="隐藏本地鼠标指针">
+          <PathIcon Classes="toolbarIcon" Data="{StaticResource IconMouse}" />
+        </ToggleButton>
+        <Button x:Name="ScreenshotButton" Classes="tool" IsEnabled="False"
+                Click="ScreenshotButton_Click" ToolTip.Tip="保存当前画面">
+          <PathIcon Classes="toolbarIcon" Data="{StaticResource IconCamera}" />
+        </Button>
+        <Button x:Name="ReleaseKeysButton" Classes="tool" Click="ReleaseKeysButton_Click"
+                ToolTip.Tip="释放全部远程按键">
+          <PathIcon Classes="toolbarIcon" Data="{StaticResource IconRelease}" />
+        </Button>
+        <Button x:Name="FullscreenButton" Classes="tool" Click="FullscreenButton_Click"
+                ToolTip.Tip="切换全屏">
+          <PathIcon Classes="toolbarIcon" Data="{StaticResource IconFullscreen}" />
+        </Button>
+        <Border Width="1" Height="24" Background="{StaticResource ToolbarLineBrush}" Margin="5,8" />
+        <Button x:Name="DisconnectButton" Classes="tool" Click="DisconnectButton_Click"
+                ToolTip.Tip="关闭连接并返回登录">
+          <PathIcon Classes="toolbarIcon" Data="{StaticResource IconDisconnect}" Foreground="#F08B83" />
+        </Button>
+      </StackPanel>
+    </Border>
+  </Grid>
+</Window>

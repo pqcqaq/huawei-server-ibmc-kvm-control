@@ -162,12 +162,13 @@ internal sealed class EncryptedSettingsStore
     private static bool IsValid(ConnectionSettings? settings) => settings is
     {
         Host.Length: > 0 and <= 2048,
-        UserName.Length: > 0 and <= 1024,
+        UserName.Length: <= 1024,
         Password.Length: > 0 and <= 4096,
         RememberSettings: true,
     } &&
         !string.IsNullOrWhiteSpace(settings.Host) &&
-        !string.IsNullOrWhiteSpace(settings.UserName) &&
+        (settings.TargetKind == ConnectionTargetKind.LinuxAgent || !string.IsNullOrWhiteSpace(settings.UserName)) &&
+        settings.TargetKind is ConnectionTargetKind.Ibmc or ConnectionTargetKind.LinuxAgent &&
         settings.ConnectionMode is ConnectionMode.Shared or ConnectionMode.Exclusive;
 
     private static void SetUnixMode(string path, UnixFileMode mode)

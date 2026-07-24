@@ -8,6 +8,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
+using IbmcKvm.Core.Agent;
 using IbmcKvm.Core.Session;
 using IbmcKvm.Desktop.Localization;
 using IbmcKvm.Desktop.Platform;
@@ -62,34 +63,106 @@ public sealed partial class LoginWindow : Window
         LocalizationManager.SetCulture(language.CultureName);
     }
 
+    private ConnectionTargetKind SelectedTargetKind => TargetTypeComboBox.SelectedIndex == 1
+        ? ConnectionTargetKind.LinuxAgent
+        : ConnectionTargetKind.Ibmc;
+
+    private void TargetTypeComboBox_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        UpdateTargetPresentation();
+        PasswordInput.Text = string.Empty;
+        LoginErrorBorder.IsVisible = false;
+    }
+
+    private void UpdateTargetPresentation()
+    {
+        if (TargetTypeComboBox is null)
+        {
+            return;
+        }
+        var isAgent = SelectedTargetKind == ConnectionTargetKind.LinuxAgent;
+        Title = LocalizationManager.Translate(isAgent ? "连接 Linux Agent" : "连接 iBMC");
+        AddressLabel.Text = LocalizationManager.Translate(isAgent ? "Linux Agent 地址" : "iBMC 地址");
+        AddressTextBox.Watermark = LocalizationManager.Translate(isAgent
+            ? "主机名、IP 或 agent://地址:端口"
+            : "主机名、IP 或 https://地址:端口");
+        UserNamePanel.IsVisible = !isAgent;
+        PasswordLabel.Text = LocalizationManager.Translate(isAgent ? "配对令牌" : "密码");
+        Grid.SetColumn(PasswordPanel, isAgent ? 0 : 2);
+        Grid.SetColumnSpan(PasswordPanel, isAgent ? 3 : 1);
+        ModeLabel.IsVisible = !isAgent;
+        ModeComboBox.IsVisible = !isAgent;
+        TrustCheckBox.Content = LocalizationManager.Translate(isAgent
+            ? "连接前确认 Agent 证书指纹"
+            : "本次会话信任自签名证书");
+        TrustCheckBox.IsChecked = isAgent || TrustCheckBox.IsChecked == true;
+        TrustCheckBox.IsEnabled = !isAgent;
+        CertificateHintText.Text = LocalizationManager.Translate(isAgent
+            ? "证书确认完成后才会在 TLS 加密通道内发送配对令牌。"
+            : "连接前显示服务器证书 SHA-256 指纹，由你确认后再发送凭据。");
+    }
+
     private async void ConnectButton_Click(object? sender, RoutedEventArgs e)
     {
-        SetBusy(true, "正在建立 HTTPS 会话");
+        SetBusy(true, SelectedTargetKind == ConnectionTargetKind.LinuxAgent
+            ? "正在建立 TLS Agent 会话"
+            : "正在建立 HTTPS 会话");
         using var operation = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
         operation.CancelAfter(TimeSpan.FromSeconds(30));
-        KvmClientSession? connectedSession = null;
+        IAsyncDisposable? connectedSession = null;
         try
         {
             var address = AddressTextBox.Text?.Trim() ?? string.Empty;
-            var endpoint = IbmcEndpoint.Parse(address);
-            var userName = UserNameTextBox.Text ?? string.Empty;
             var password = PasswordInput.Text ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(userName) || string.IsNullOrEmpty(password))
+            Window consoleWindow;
+            if (SelectedTargetKind == ConnectionTargetKind.LinuxAgent)
             {
-                throw new InvalidOperationException(LocalizationManager.Translate("请输入用户名和密码。"));
+                if (string.IsNullOrWhiteSpace(password))
+                {
+                    throw new InvalidOperationException(LocalizationManager.Translate("请输入 Linux Agent 配对令牌。"));
+                }
+                var endpoint = AgentEndpoint.Parse(address);
+                var fingerprint = await ResolveAgentCertificateAsync(endpoint, operation.Token);
+                SetBusy(true, "正在验证 Linux Agent 配对令牌");
+                var agent = await AgentClientSession.ConnectAsync(
+                    new AgentConnectionOptions(endpoint.Host, endpoint.Port, password, fingerprint),
+                    operation.Token);
+                connectedSession = agent;
+                var settingsPersisted = await PersistConnectionSettingsAsync(
+                    address,
+                    string.Empty,
+                    password,
+                    ConnectionMode.Shared,
+                    ConnectionTargetKind.LinuxAgent);
+                consoleWindow = new AgentConsoleWindow(
+                    agent,
+                    $"{endpoint.Host}:{endpoint.Port}",
+                    settingsPersisted);
             }
-
-            var mode = ModeComboBox.SelectedIndex == 1 ? ConnectionMode.Exclusive : ConnectionMode.Shared;
-            var connected = await ConnectWithDiscoveryAsync(endpoint, userName, password, mode, operation.Token);
-            connectedSession = connected.Session;
-            var settingsPersisted = await PersistConnectionSettingsAsync(address, userName, password, mode);
+            else
+            {
+                var endpoint = IbmcEndpoint.Parse(address);
+                var userName = UserNameTextBox.Text ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(userName) || string.IsNullOrEmpty(password))
+                {
+                    throw new InvalidOperationException(LocalizationManager.Translate("请输入用户名和密码。"));
+                }
+                var mode = ModeComboBox.SelectedIndex == 1 ? ConnectionMode.Exclusive : ConnectionMode.Shared;
+                var connected = await ConnectWithDiscoveryAsync(endpoint, userName, password, mode, operation.Token);
+                connectedSession = connected.Session;
+                var settingsPersisted = await PersistConnectionSettingsAsync(
+                    address,
+                    userName,
+                    password,
+                    mode,
+                    ConnectionTargetKind.Ibmc);
+                consoleWindow = new ConsoleWindow(
+                    connected.Session,
+                    $"{endpoint.Host}:{connected.Port}",
+                    settingsPersisted,
+                    mode == ConnectionMode.Exclusive);
+            }
             PasswordInput.Text = string.Empty;
-
-            var consoleWindow = new ConsoleWindow(
-                connectedSession,
-                $"{endpoint.Host}:{connected.Port}",
-                settingsPersisted,
-                mode == ConnectionMode.Exclusive);
             connectedSession = null;
             if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
@@ -119,6 +192,34 @@ public sealed partial class LoginWindow : Window
                 SetBusy(false);
             }
         }
+    }
+
+    private async Task<string> ResolveAgentCertificateAsync(
+        AgentEndpoint endpoint,
+        CancellationToken cancellationToken)
+    {
+        var trustScope = new IbmcEndpoint(endpoint.Host, endpoint.Port);
+        var stored = await certificateTrustStore.ResolveAsync(trustScope, cancellationToken: cancellationToken);
+        SetBusy(true, "正在读取 Linux Agent 证书");
+        var details = await AgentClientSession.ProbeCertificateAsync(endpoint.Host, endpoint.Port, cancellationToken);
+        if (stored.ServerFingerprint is not null && string.Equals(
+                CertificateFingerprint.Normalize(stored.ServerFingerprint),
+                CertificateFingerprint.Normalize(details.Sha256Fingerprint),
+                StringComparison.Ordinal))
+        {
+            return details.Sha256Fingerprint;
+        }
+
+        var decision = await new CertificateDecisionWindow(details).ShowDialog<CertificateDecision>(this);
+        if (decision == CertificateDecision.Cancel)
+        {
+            throw new OperationCanceledException(LocalizationManager.Translate("用户未信任 Linux Agent 证书。"), cancellationToken);
+        }
+        if (decision == CertificateDecision.PersistServer)
+        {
+            await certificateTrustStore.TrustServerAsync(trustScope, details, cancellationToken);
+        }
+        return details.Sha256Fingerprint;
     }
 
     private async Task<ConnectedKvm> ConnectWithDiscoveryAsync(
@@ -268,7 +369,12 @@ public sealed partial class LoginWindow : Window
     {
         try
         {
-            var endpoint = IbmcEndpoint.Parse(AddressTextBox.Text?.Trim() ?? string.Empty);
+            var address = AddressTextBox.Text?.Trim() ?? string.Empty;
+            var endpoint = SelectedTargetKind == ConnectionTargetKind.LinuxAgent
+                ? AgentEndpoint.Parse(address) is { } agent
+                    ? new IbmcEndpoint(agent.Host, agent.Port)
+                    : throw new InvalidOperationException()
+                : IbmcEndpoint.Parse(address);
             await new CertificateTrustWindow(certificateTrustStore, endpoint).ShowDialog(this);
         }
         catch (FormatException exception)
@@ -301,11 +407,14 @@ public sealed partial class LoginWindow : Window
                 return;
             }
 
+            TargetTypeComboBox.SelectedIndex = settings.TargetKind == ConnectionTargetKind.LinuxAgent ? 1 : 0;
+            UpdateTargetPresentation();
             AddressTextBox.Text = settings.Host;
             UserNameTextBox.Text = settings.UserName;
             PasswordInput.Text = settings.Password;
             ModeComboBox.SelectedIndex = settings.ConnectionMode == ConnectionMode.Exclusive ? 1 : 0;
-            TrustCheckBox.IsChecked = settings.TrustSelfSignedCertificate;
+            TrustCheckBox.IsChecked = settings.TargetKind == ConnectionTargetKind.LinuxAgent ||
+                                      settings.TrustSelfSignedCertificate;
             RememberSettingsCheckBox.IsChecked = true;
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -318,7 +427,8 @@ public sealed partial class LoginWindow : Window
         string host,
         string userName,
         string password,
-        ConnectionMode mode)
+        ConnectionMode mode,
+        ConnectionTargetKind targetKind)
     {
         if (RememberSettingsCheckBox.IsChecked != true)
         {
@@ -333,7 +443,8 @@ public sealed partial class LoginWindow : Window
                 password,
                 mode,
                 TrustCheckBox.IsChecked == true,
-                RememberSettings: true), lifetime.Token);
+                RememberSettings: true,
+                targetKind), lifetime.Token);
             return true;
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -356,7 +467,7 @@ public sealed partial class LoginWindow : Window
         UserNameTextBox.Text = string.Empty;
         PasswordInput.Text = string.Empty;
         ModeComboBox.SelectedIndex = 0;
-        TrustCheckBox.IsChecked = false;
+        TrustCheckBox.IsChecked = SelectedTargetKind == ConnectionTargetKind.LinuxAgent;
         LoginErrorBorder.IsVisible = false;
         AddressTextBox.Focus();
     }
