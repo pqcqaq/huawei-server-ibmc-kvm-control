@@ -13,7 +13,6 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using IbmcKvm.App.Input;
 using IbmcKvm.App.Localization;
-using IbmcKvm.App.Recording;
 using IbmcKvm.App.Ui;
 using IbmcKvm.Core.Input;
 using IbmcKvm.Core.Recording;

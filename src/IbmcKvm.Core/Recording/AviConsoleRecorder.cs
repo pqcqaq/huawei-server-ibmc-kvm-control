@@ -1,13 +1,11 @@
 using System.IO;
 using System.Threading.Channels;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using IbmcKvm.Core.Recording;
 using IbmcKvm.Core.Video;
+using SkiaSharp;
 
-namespace IbmcKvm.App.Recording;
+namespace IbmcKvm.Core.Recording;
 
-internal sealed class AviConsoleRecorder : IAsyncDisposable
+public sealed class AviConsoleRecorder : IAsyncDisposable
 {
     private readonly MjpegAviWriter writer;
     private readonly int writerWidth;
@@ -98,30 +96,35 @@ internal sealed class AviConsoleRecorder : IAsyncDisposable
         int writerWidth,
         int writerHeight)
     {
-        BitmapSource source = BitmapSource.Create(
+        var sourceInfo = new SKImageInfo(
             frame.Width,
             frame.Height,
-            96,
-            96,
-            PixelFormats.Bgra32,
-            null,
-            frame.Pixels,
-            checked(frame.Width * 4));
-        if (frame.Width != writerWidth || frame.Height != writerHeight)
+            SKColorType.Bgra8888,
+            SKAlphaType.Unpremul);
+        using var source = new SKBitmap(sourceInfo);
+        System.Runtime.InteropServices.Marshal.Copy(frame.Pixels, 0, source.GetPixels(), frame.Pixels.Length);
+        using var destination = frame.Width == writerWidth && frame.Height == writerHeight
+            ? null
+            : new SKBitmap(new SKImageInfo(
+                writerWidth,
+                writerHeight,
+                SKColorType.Bgra8888,
+                SKAlphaType.Unpremul));
+        var encodedSource = source;
+        if (destination is not null)
         {
-            source = new TransformedBitmap(
-                source,
-                new ScaleTransform(
-                    (double)writerWidth / frame.Width,
-                    (double)writerHeight / frame.Height));
+            if (!source.ScalePixels(destination, SKFilterQuality.Medium))
+            {
+                throw new InvalidDataException("The decoded frame could not be resized for AVI recording.");
+            }
+
+            encodedSource = destination;
         }
 
-        source.Freeze();
-        var encoder = new JpegBitmapEncoder { QualityLevel = 85 };
-        encoder.Frames.Add(BitmapFrame.Create(source));
-        using var output = new MemoryStream();
-        encoder.Save(output);
-        return output.ToArray();
+        using var image = SKImage.FromBitmap(encodedSource);
+        using var encoded = image.Encode(SKEncodedImageFormat.Jpeg, 85)
+            ?? throw new InvalidDataException("The decoded frame could not be encoded as JPEG.");
+        return encoded.ToArray();
     }
 
     private sealed record DecodedRecordingFrame(int Width, int Height, byte[] Pixels);

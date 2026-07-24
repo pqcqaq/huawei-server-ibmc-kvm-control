@@ -1,0 +1,143 @@
+<Window x:Class="IbmcKvm.Desktop.Views.VirtualMediaWindow"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="虚拟媒体" Width="940" Height="650" MinWidth="820" MinHeight="580"
+        WindowStartupLocation="CenterOwner" Icon="avares://IbmcKvm.Desktop/Assets/IbmcKvm.ico">
+  <Window.Styles>
+    <Style Selector="TextBlock.sectionLabel">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="#66716C" />
+      <Setter Property="Margin" Value="0,14,0,5" />
+    </Style>
+    <Style Selector="Button.media">
+      <Setter Property="MinWidth" Value="86" />
+      <Setter Property="Margin" Value="0,0,8,0" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="54,*,32">
+    <Border Background="{StaticResource HeaderBrush}" BorderBrush="#33403B" BorderThickness="0,0,0,1">
+      <Grid Margin="18,0,12,0" ColumnDefinitions="*,Auto">
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+          <PathIcon Data="{StaticResource IconDisc}" Width="20" Height="20" Foreground="#49C98A" Margin="0,0,10,0" />
+          <TextBlock Text="虚拟媒体" FontWeight="SemiBold" FontSize="18" Foreground="#F2F5F3" VerticalAlignment="Center" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Spacing="6">
+          <Button x:Name="ReconnectButton" Classes="tool" Click="ReconnectButton_Click" ToolTip.Tip="重新连接已挂载介质">
+            <PathIcon Classes="toolbarIcon" Data="{StaticResource IconSync}" />
+          </Button>
+          <Button x:Name="RefreshDrivesButton" Classes="tool" Click="RefreshDrivesButton_Click" ToolTip.Tip="刷新物理驱动器">
+            <PathIcon Classes="toolbarIcon" Data="{StaticResource IconSync}" />
+          </Button>
+          <Button x:Name="UsbResetButton" Classes="tool" Width="104" MinWidth="104"
+                  Click="UsbResetButton_Click" ToolTip.Tip="重置远端 USB 虚拟媒体设备">
+            <StackPanel Orientation="Horizontal" Spacing="7">
+              <PathIcon Data="{StaticResource IconRelease}" Width="17" Height="17" Foreground="#FFD27A" />
+              <TextBlock Text="USB reset" Foreground="White" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="1" ColumnDefinitions="*,1,*">
+      <Grid Grid.Column="0" Margin="24,22,24,20" RowDefinitions="Auto,*,Auto">
+        <StackPanel>
+          <StackPanel Orientation="Horizontal">
+            <Border Width="34" Height="34" Background="#DDE7E1" BorderBrush="#B9CEC0" BorderThickness="1">
+              <PathIcon Data="{StaticResource IconDisc}" Width="18" Height="18" Foreground="#176845"
+                        HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <StackPanel Margin="11,0,0,0">
+              <TextBlock Text="虚拟软驱" FontWeight="SemiBold" FontSize="17" />
+              <TextBlock x:Name="FloppyStatusText" Text="未挂载" FontSize="10" Foreground="#66716C" />
+            </StackPanel>
+          </StackPanel>
+
+          <TextBlock Text="来源" Classes="sectionLabel" />
+          <ComboBox x:Name="FloppySourceComboBox" SelectedIndex="0" SelectionChanged="SourceComboBox_SelectionChanged">
+            <ComboBoxItem Content="软盘镜像 (.img)" Tag="Image" />
+            <ComboBoxItem Content="物理软驱" Tag="PhysicalDrive" />
+          </ComboBox>
+
+          <Grid x:Name="FloppyPathPanel" ColumnDefinitions="*,38">
+            <TextBox x:Name="FloppyPathTextBox" Margin="0,14,6,0" />
+            <Button Grid.Column="1" Margin="0,14,0,0" Padding="8" Click="BrowseFloppyButton_Click" ToolTip.Tip="选择软盘镜像">
+              <PathIcon Data="{StaticResource IconImage}" Width="16" Height="16" />
+            </Button>
+          </Grid>
+          <ComboBox x:Name="FloppyDriveComboBox" Margin="0,14,0,0" IsVisible="False">
+            <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding DisplayName}" /></DataTemplate></ComboBox.ItemTemplate>
+          </ComboBox>
+          <CheckBox x:Name="FloppyWriteProtectCheckBox" Content="写保护" IsChecked="True" Margin="0,16,0,0" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="2">
+          <ProgressBar x:Name="FloppyProgressBar" Height="3" Minimum="0" Maximum="100" IsVisible="False" Margin="0,0,0,14" />
+          <WrapPanel>
+            <Button x:Name="MountFloppyButton" Content="挂载" Classes="primary" MinWidth="92" Margin="0,0,8,8"
+                    Click="MountFloppyButton_Click" />
+            <Button x:Name="EjectFloppyButton" Content="弹出" Classes="media" IsEnabled="False" Margin="0,0,8,8"
+                    Click="EjectFloppyButton_Click" />
+            <Button x:Name="CreateFloppyImageButton" Content="制作镜像" Classes="media" IsVisible="False" Margin="0,0,0,8"
+                    Click="CreateFloppyImageButton_Click" />
+          </WrapPanel>
+        </StackPanel>
+      </Grid>
+
+      <Border Grid.Column="1" Background="#D4D6D1" />
+
+      <Grid Grid.Column="2" Margin="24,22,24,20" RowDefinitions="Auto,*,Auto">
+        <StackPanel>
+          <StackPanel Orientation="Horizontal">
+            <Border Width="34" Height="34" Background="#E8E2D5" BorderBrush="#CFC2A4" BorderThickness="1">
+              <PathIcon Data="{StaticResource IconDisc}" Width="18" Height="18" Foreground="#806324"
+                        HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <StackPanel Margin="11,0,0,0">
+              <TextBlock Text="虚拟光驱" FontWeight="SemiBold" FontSize="17" />
+              <TextBlock x:Name="OpticalStatusText" Text="未挂载" FontSize="10" Foreground="#66716C" />
+            </StackPanel>
+          </StackPanel>
+
+          <TextBlock Text="来源" Classes="sectionLabel" />
+          <ComboBox x:Name="OpticalSourceComboBox" SelectedIndex="0" SelectionChanged="SourceComboBox_SelectionChanged">
+            <ComboBoxItem Content="光盘镜像 (.iso)" Tag="Image" />
+            <ComboBoxItem Content="物理光驱" Tag="PhysicalDrive" />
+            <ComboBoxItem Content="本地目录" Tag="Directory" />
+          </ComboBox>
+
+          <Grid x:Name="OpticalPathPanel" ColumnDefinitions="*,38">
+            <TextBox x:Name="OpticalPathTextBox" Margin="0,14,6,0" />
+            <Button Grid.Column="1" Margin="0,14,0,0" Padding="8" Click="BrowseOpticalButton_Click" ToolTip.Tip="选择镜像或目录">
+              <PathIcon Data="{StaticResource IconImage}" Width="16" Height="16" />
+            </Button>
+          </Grid>
+          <ComboBox x:Name="OpticalDriveComboBox" Margin="0,14,0,0" IsVisible="False">
+            <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding DisplayName}" /></DataTemplate></ComboBox.ItemTemplate>
+          </ComboBox>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2">
+          <ProgressBar x:Name="OpticalProgressBar" Height="3" Minimum="0" Maximum="100" IsVisible="False" Margin="0,0,0,14" />
+          <WrapPanel>
+            <Button x:Name="MountOpticalButton" Content="挂载" Classes="primary" MinWidth="92" Margin="0,0,8,8"
+                    Click="MountOpticalButton_Click" />
+            <Button x:Name="EjectOpticalButton" Content="弹出" Classes="media" IsEnabled="False" Margin="0,0,8,8"
+                    Click="EjectOpticalButton_Click" />
+            <Button x:Name="CreateOpticalImageButton" Content="制作镜像" Classes="media" IsVisible="False" Margin="0,0,0,8"
+                    Click="CreateOpticalImageButton_Click" />
+          </WrapPanel>
+        </StackPanel>
+      </Grid>
+    </Grid>
+
+    <Border Grid.Row="2" Background="#DADCD7" BorderBrush="#C1C5C0" BorderThickness="0,1,0,0">
+      <Grid Margin="12,0" ColumnDefinitions="*,Auto">
+        <TextBlock x:Name="OperationStatusText" Text="就绪" VerticalAlignment="Center" Foreground="#44504B" FontSize="10" />
+        <TextBlock Grid.Column="1" x:Name="CapabilityText" Text="VMM 未查询" VerticalAlignment="Center"
+                   Foreground="#68736E" FontSize="10" />
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

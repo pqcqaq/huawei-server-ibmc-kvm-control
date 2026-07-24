@@ -1,0 +1,53 @@
+<Window x:Class="IbmcKvm.Desktop.Views.CertificateTrustWindow"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="证书信任管理" Width="920" Height="560" MinWidth="760" MinHeight="480"
+        WindowStartupLocation="CenterOwner" Icon="avares://IbmcKvm.Desktop/Assets/IbmcKvm.ico">
+  <Grid RowDefinitions="64,*,60">
+    <Border Background="{StaticResource HeaderBrush}">
+      <Grid Margin="20,0" ColumnDefinitions="*,Auto">
+        <TextBlock Text="证书信任管理" Foreground="White" FontSize="17" FontWeight="SemiBold"
+                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,16,0" />
+        <TextBlock x:Name="ScopeText" Grid.Column="1" Foreground="#AAB6B0" FontSize="10" VerticalAlignment="Center" />
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="1" Margin="20,18" RowDefinitions="34,*">
+      <Border Background="#E3E5E1" BorderBrush="{StaticResource LineBrush}" BorderThickness="1">
+        <Grid ColumnDefinitions="100,155,235,110,*">
+          <TextBlock Text="类型" Margin="10,0" VerticalAlignment="Center" FontWeight="SemiBold" />
+          <TextBlock Grid.Column="1" Text="范围" Margin="10,0" VerticalAlignment="Center" FontWeight="SemiBold" />
+          <TextBlock Grid.Column="2" Text="主题" Margin="10,0" VerticalAlignment="Center" FontWeight="SemiBold" />
+          <TextBlock Grid.Column="3" Text="有效期至" Margin="10,0" VerticalAlignment="Center" FontWeight="SemiBold" />
+          <TextBlock Grid.Column="4" Text="SHA-256" Margin="10,0" VerticalAlignment="Center" FontWeight="SemiBold" />
+        </Grid>
+      </Border>
+      <ListBox x:Name="TrustList" Grid.Row="1" BorderBrush="{StaticResource LineBrush}" BorderThickness="1,0,1,1"
+               SelectionChanged="TrustList_SelectionChanged">
+        <ListBox.ItemTemplate>
+          <DataTemplate>
+            <Grid ColumnDefinitions="100,155,235,110,*" MinHeight="32">
+              <TextBlock Text="{Binding KindLabel}" Margin="10,0" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1" Text="{Binding Scope}" Margin="10,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+              <TextBlock Grid.Column="2" Text="{Binding Subject}" Margin="10,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+              <TextBlock Grid.Column="3" Text="{Binding ValidUntil}" Margin="10,0" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="4" Text="{Binding Fingerprint}" Margin="10,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            </Grid>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </Grid>
+
+    <Border Grid.Row="2" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0">
+      <Grid Margin="20,0" ColumnDefinitions="*,Auto">
+        <TextBlock Text="导入的 CA 仅用于当前主机和 HTTPS 端口，不修改系统证书库。"
+                   Foreground="{StaticResource MutedBrush}" FontSize="10" VerticalAlignment="Center"
+                   TextTrimming="CharacterEllipsis" Margin="0,0,16,0" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Spacing="8">
+          <Button x:Name="RevokeButton" Content="撤销" IsEnabled="False" Click="RevokeButton_Click" />
+          <Button Content="导入 CA" Classes="primary" Click="ImportAuthorityButton_Click" />
+        </StackPanel>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

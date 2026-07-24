@@ -386,6 +386,7 @@ public partial class LoginWindow : Window, IDisposable
 
     private static string GetLoginError(IbmcLoginResponse response) => response.Error switch
     {
+        LoginErrorCode.InvalidCredentials => LocalizationManager.Translate("用户名或密码不正确。请核对大小写和密码末尾字符。"),
         LoginErrorCode.UserLocked => LocalizationManager.Translate("iBMC 用户已锁定。"),
         LoginErrorCode.InsufficientPrivilege => LocalizationManager.Translate("该用户没有远程控制权限。"),
         LoginErrorCode.PasswordExpired => LocalizationManager.Translate("iBMC 密码已过期。"),

@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\IbmcKvm.Core\IbmcKvm.Core.csproj" />
+    <ProjectReference Include="..\IbmcKvm.Protocol\IbmcKvm.Protocol.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.18" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.18" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.18" />
+    <PackageReference Include="Ace4896.DBus.Services.Secrets" Version="1.6.0" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="2.88.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+    <AvaloniaResource Include="..\IbmcKvm.App\Resources\IbmcKvm.ico" Link="Assets\IbmcKvm.ico" />
+    <AvaloniaResource Include="..\..\docs\assets\project-mark.svg" Link="Assets\project-mark.svg" />
+    <Content Include="..\IbmcKvm.App\Resources\Strings.*.json" Link="Resources\%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+    <ApplicationIcon>..\IbmcKvm.App\Resources\IbmcKvm.ico</ApplicationIcon>
+    <AssemblyName>IbmcKvm.Desktop</AssemblyName>
+    <RootNamespace>IbmcKvm.Desktop</RootNamespace>
+  </PropertyGroup>
+
+</Project>

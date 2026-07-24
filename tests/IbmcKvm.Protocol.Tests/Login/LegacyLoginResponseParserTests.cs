@@ -24,6 +24,7 @@ public sealed class LegacyLoginResponseParserTests
     }
 
     [Theory]
+    [InlineData("[130]", LoginErrorCode.InvalidCredentials)]
     [InlineData("[144]", LoginErrorCode.LoginRestricted)]
     [InlineData("[136]", LoginErrorCode.InsufficientPrivilege)]
     [InlineData("[137]", LoginErrorCode.PasswordExpired)]
@@ -48,4 +49,3 @@ public sealed class LegacyLoginResponseParserTests
         Assert.Throws<FormatException>(() => LegacyLoginResponseParser.Parse(raw));
     }
 }
-

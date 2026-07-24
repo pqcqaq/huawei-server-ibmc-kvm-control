@@ -1,0 +1,29 @@
+<Window x:Class="IbmcKvm.Desktop.Views.CustomKeyCombinationWindow"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="自定义组合键" Width="560" Height="400" MinWidth="520" MinHeight="380"
+        WindowStartupLocation="CenterOwner" Background="#111714" ShowInTaskbar="False"
+        Icon="avares://IbmcKvm.Desktop/Assets/IbmcKvm.ico">
+  <Grid Margin="24" RowDefinitions="Auto,Auto,*,Auto,Auto">
+    <TextBlock Text="自定义组合键" FontWeight="SemiBold" FontSize="20" Foreground="#F0F4F2" />
+    <TextBlock Grid.Row="1" Margin="0,6,0,18" Foreground="#9EAAA4" FontSize="12"
+               Text="选择最多六个 HID 按键。发送后会自动释放全部按键。" />
+
+    <Grid Grid.Row="2" ColumnDefinitions="*,14,*" RowDefinitions="Auto,12,Auto,12,Auto">
+      <ComboBox x:Name="Key1ComboBox" Grid.Row="0" Grid.Column="0" AutomationProperties.AutomationId="Key1ComboBox" />
+      <ComboBox x:Name="Key2ComboBox" Grid.Row="0" Grid.Column="2" AutomationProperties.AutomationId="Key2ComboBox" />
+      <ComboBox x:Name="Key3ComboBox" Grid.Row="2" Grid.Column="0" AutomationProperties.AutomationId="Key3ComboBox" />
+      <ComboBox x:Name="Key4ComboBox" Grid.Row="2" Grid.Column="2" AutomationProperties.AutomationId="Key4ComboBox" />
+      <ComboBox x:Name="Key5ComboBox" Grid.Row="4" Grid.Column="0" AutomationProperties.AutomationId="Key5ComboBox" />
+      <ComboBox x:Name="Key6ComboBox" Grid.Row="4" Grid.Column="2" AutomationProperties.AutomationId="Key6ComboBox" />
+    </Grid>
+
+    <TextBlock x:Name="ValidationText" Grid.Row="3" Margin="0,14,0,8"
+               Foreground="#F08B83" FontSize="11" MinHeight="16" />
+
+    <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button Content="取消" Width="88" Click="CancelButton_Click" />
+      <Button Content="发送" Width="88" Classes="primary" IsDefault="True" Click="SendButton_Click" />
+    </StackPanel>
+  </Grid>
+</Window>

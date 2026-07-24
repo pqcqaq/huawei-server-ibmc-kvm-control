@@ -86,6 +86,7 @@ public static class LegacyLoginResponseParser
     private static LoginErrorCode MapError(int rawError) => rawError switch
     {
         0 => LoginErrorCode.None,
+        130 => LoginErrorCode.InvalidCredentials,
         131 => LoginErrorCode.UserLocked,
         136 => LoginErrorCode.InsufficientPrivilege,
         137 => LoginErrorCode.PasswordExpired,
@@ -134,4 +135,3 @@ public static class LegacyLoginResponseParser
         return port;
     }
 }
-

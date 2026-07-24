@@ -1,0 +1,15 @@
+<Window x:Class="IbmcKvm.Desktop.Views.MessageDialog"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Width="500" Height="240" CanResize="False" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner" Icon="avares://IbmcKvm.Desktop/Assets/IbmcKvm.ico">
+  <Grid Margin="25" RowDefinitions="Auto,*,Auto">
+    <TextBlock x:Name="HeadingText" FontSize="19" FontWeight="SemiBold" />
+    <TextBlock x:Name="MessageText" Grid.Row="1" TextWrapping="Wrap" Foreground="#4F5E57"
+               Margin="0,14,0,18" />
+    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button x:Name="CancelButton" Content="取消" Click="CancelButton_Click" />
+      <Button x:Name="ConfirmButton" Classes="primary" Content="确认" Click="ConfirmButton_Click" />
+    </StackPanel>
+  </Grid>
+</Window>

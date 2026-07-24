@@ -93,6 +93,63 @@ public sealed class KvmClientSessionTests
     }
 
     [Fact]
+    public async Task PreservesBurstOfDependentVideoFramesInOrder()
+    {
+        var listener = StartListener();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var allFramesSent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseServer = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var serverTask = RunServerAsync(listener, async (stream, cancellationToken) =>
+        {
+            await CompleteHandshakeAsync(stream, cancellationToken);
+            for (byte frameNumber = 1; frameNumber <= 5; frameNumber++)
+            {
+                var metadata = new byte[17];
+                metadata[2] = frameNumber;
+                BinaryPrimitives.WriteUInt32BigEndian(metadata.AsSpan(3, 4), 4);
+                metadata[7] = frameNumber == 1 ? (byte)0 : (byte)0x80;
+                metadata[8] = 64;
+                BinaryPrimitives.WriteUInt16BigEndian(metadata.AsSpan(9, 2), 64);
+                metadata[16] = 3;
+                await stream.WriteAsync(
+                    BuildIncoming([0x02, 1, .. metadata]),
+                    cancellationToken);
+
+                byte[] data = [0, 1, frameNumber, 0, 0, 100, 128];
+                await stream.WriteAsync(
+                    BuildIncoming([0x02, 1, .. data]),
+                    cancellationToken);
+            }
+
+            allFramesSent.TrySetResult();
+            await releaseServer.Task.WaitAsync(cancellationToken);
+        }, timeout.Token);
+
+        await using var session = await KvmClientSession.ConnectAsync(
+            new KvmConnectionOptions("127.0.0.1", GetPort(listener), 7),
+            timeout.Token);
+        await allFramesSent.Task.WaitAsync(timeout.Token);
+        await Task.Delay(250, timeout.Token);
+
+        try
+        {
+            await using var frames = session.ReadFramesAsync(timeout.Token).GetAsyncEnumerator(timeout.Token);
+            for (byte expected = 1; expected <= 5; expected++)
+            {
+                Assert.True(await frames.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(2), timeout.Token));
+                Assert.Equal(expected, frames.Current.FrameNumber);
+                Assert.Equal(expected != 1, frames.Current.IsDifference);
+            }
+        }
+        finally
+        {
+            releaseServer.TrySetResult();
+        }
+
+        await serverTask;
+    }
+
+    [Fact]
     public async Task SendsEncryptedKeyboardAndAbsoluteMouseForTheModernSession()
     {
         var listener = StartListener();

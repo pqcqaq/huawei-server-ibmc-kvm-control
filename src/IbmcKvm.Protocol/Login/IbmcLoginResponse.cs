@@ -3,6 +3,7 @@ namespace IbmcKvm.Protocol.Login;
 public enum LoginErrorCode
 {
     None = 0,
+    InvalidCredentials,
     UserLocked,
     InsufficientPrivilege,
     PasswordExpired,
@@ -36,4 +37,3 @@ public sealed record IbmcLoginResponse
 
     public string? ExtendedVerifyValue { get; init; }
 }
-

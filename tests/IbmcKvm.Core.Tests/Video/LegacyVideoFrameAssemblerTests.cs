@@ -9,6 +9,9 @@ public sealed class LegacyVideoFrameAssemblerTests
     public void CompletesFrameAndExtractsMetadata()
     {
         var assembler = new LegacyVideoFrameAssembler();
+        Assert.False(assembler.TryAddChunk(FirstChunk(frame: 8, expectedLength: 1, difference: false), out _));
+        Assert.True(assembler.TryAddChunk(Chunk(1, 8, 0), out _));
+
         var first = FirstChunk(frame: 9, expectedLength: 5, difference: true);
         Assert.False(assembler.TryAddChunk(first, out _));
 
@@ -54,6 +57,21 @@ public sealed class LegacyVideoFrameAssemblerTests
 
         Assert.Throws<InvalidDataException>(() => assembler.TryAddChunk(
             FirstChunk(frame: 1, expectedLength: 14, difference: false), out _));
+    }
+
+    [Fact]
+    public void RejectsDifferenceFrameThatSkipsTheExpectedSequence()
+    {
+        var assembler = new LegacyVideoFrameAssembler();
+        Assert.False(assembler.TryAddChunk(FirstChunk(frame: 1, expectedLength: 1, difference: false), out _));
+        Assert.True(assembler.TryAddChunk(Chunk(1, 1, 0xAA), out _));
+
+        Assert.False(assembler.TryAddChunk(FirstChunk(frame: 3, expectedLength: 1, difference: true), out _));
+        Assert.Throws<InvalidDataException>(() => assembler.TryAddChunk(Chunk(1, 3, 0xBB), out _));
+
+        Assert.False(assembler.TryAddChunk(FirstChunk(frame: 4, expectedLength: 1, difference: false), out _));
+        Assert.True(assembler.TryAddChunk(Chunk(1, 4, 0xCC), out var fullFrame));
+        Assert.Equal(4, fullFrame!.FrameNumber);
     }
 
     private static byte[] FirstChunk(byte frame, int expectedLength, bool difference)

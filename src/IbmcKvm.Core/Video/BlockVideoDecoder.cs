@@ -1,10 +1,8 @@
 using System.Buffers.Binary;
 using System.IO;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using IbmcKvm.Core.Video;
+using SkiaSharp;
 
-namespace IbmcKvm.App;
+namespace IbmcKvm.Core.Video;
 
 /// <summary>
 /// Decodes the 64x64 block stream used by newer Huawei iBMC firmware.
@@ -99,19 +97,25 @@ public sealed class BlockVideoDecoder
         jpeg[^2] = 0xFF;
         jpeg[^1] = 0xD9;
 
-        using var stream = new MemoryStream(jpeg, writable: false);
-        var decoder = new JpegBitmapDecoder(
-            stream,
-            BitmapCreateOptions.PreservePixelFormat,
-            BitmapCacheOption.OnLoad);
-        var converted = new FormatConvertedBitmap(decoder.Frames[0], PixelFormats.Bgra32, null, 0);
-        if (converted.PixelWidth != BlockSize || converted.PixelHeight != BlockSize)
+        using var bitmap = SKBitmap.Decode(jpeg)
+            ?? throw new InvalidDataException("An iBMC JPEG block could not be decoded.");
+        if (bitmap.Width != BlockSize || bitmap.Height != BlockSize)
         {
             throw new InvalidDataException("An iBMC JPEG block is not 64x64 pixels.");
         }
 
         var pixels = new byte[BlockSize * BlockSize * 4];
-        converted.CopyPixels(pixels, BlockSize * 4, 0);
+        using var converted = new SKBitmap(new SKImageInfo(
+            BlockSize,
+            BlockSize,
+            SKColorType.Bgra8888,
+            SKAlphaType.Unpremul));
+        if (!bitmap.CopyTo(converted, SKColorType.Bgra8888))
+        {
+            throw new InvalidDataException("An iBMC JPEG block could not be converted to BGRA32.");
+        }
+
+        System.Runtime.InteropServices.Marshal.Copy(converted.GetPixels(), pixels, 0, pixels.Length);
         blocks[blockNumber] = new BlockState(pixels, -1, []);
         return 3 + length;
     }

@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Collections.Immutable;
+using System.Net.Sockets;
 using System.Threading.Channels;
 using IbmcKvm.Core.Input;
 using IbmcKvm.Core.Video;
@@ -167,7 +168,10 @@ public sealed class KvmClientSession : IAsyncDisposable
         this.cryptography = cryptography;
         frames = Channel.CreateBounded<EncodedVideoFrame>(new BoundedChannelOptions(2)
         {
-            FullMode = BoundedChannelFullMode.DropOldest,
+            // Every difference frame depends on the decoder state produced by
+            // all preceding frames. Dropping an old frame leaves unchanged
+            // blocks backed by stale pixels until the next full frame.
+            FullMode = BoundedChannelFullMode.Wait,
             SingleReader = false,
             SingleWriter = true,
             AllowSynchronousContinuations = false,
@@ -1033,7 +1037,16 @@ public sealed class KvmClientSession : IAsyncDisposable
         }
 
         lifetime.Cancel();
-        await connection.DisposeAsync().ConfigureAwait(false);
+        try
+        {
+            await connection.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception exception) when (
+            exception is IOException or SocketException or ObjectDisposedException or OperationCanceledException)
+        {
+            // A peer reset during local teardown is an expected transport end
+            // state and must not escape an async window-closed handler.
+        }
         try
         {
             await Task.WhenAll(receiveLoop, heartbeatLoop).ConfigureAwait(false);
@@ -1298,10 +1311,15 @@ public sealed class KvmClientSession : IAsyncDisposable
                         chunk = normalized;
                     }
 
-                    if (chunk.Length >= 8 && chunk[0] == 0 && chunk[1] == 0 && (chunk[7] & 0x80) != 0)
+                    if (chunk.Length >= 17 &&
+                        chunk[0] == 0 &&
+                        chunk[1] == 0 &&
+                        (chunk[7] & 0x80) != 0 &&
+                        System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(chunk.Slice(3, 4)) == 0)
                     {
-                        // New-compression firmware emits a zero-length marker when the
-                        // desktop is unchanged. KVM DrawThread drops it before assembly.
+                        // New-compression firmware emits a zero-length difference marker
+                        // when the desktop is unchanged. Non-empty difference frames must
+                        // reach the assembler in sequence.
                         continue;
                     }
 

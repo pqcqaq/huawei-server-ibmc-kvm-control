@@ -1,9 +1,9 @@
 using System.IO;
 using System.Text;
-using IbmcKvm.App.Recording;
+using IbmcKvm.Core.Recording;
 using IbmcKvm.Core.Video;
 
-namespace IbmcKvm.App.Tests.Recording;
+namespace IbmcKvm.Core.Tests.Recording;
 
 public sealed class AviConsoleRecorderTests
 {

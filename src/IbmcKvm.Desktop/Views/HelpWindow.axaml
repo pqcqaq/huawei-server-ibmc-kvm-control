@@ -1,0 +1,60 @@
+<Window x:Class="IbmcKvm.Desktop.Views.HelpWindow"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="iBMC KVM 帮助" Width="860" Height="650" MinWidth="720" MinHeight="540"
+        WindowStartupLocation="CenterOwner" Icon="avares://IbmcKvm.Desktop/Assets/IbmcKvm.ico">
+  <Grid RowDefinitions="64,*,54">
+    <Border Background="{StaticResource HeaderBrush}">
+      <Grid Margin="22,0" ColumnDefinitions="*,Auto">
+        <TextBlock Text="iBMC KVM 帮助" Foreground="White" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="1" Text="连接 · 输入 · 录像 · 电源 · 虚拟媒体"
+                   Foreground="#AAB6B0" FontSize="10" VerticalAlignment="Center" />
+      </Grid>
+    </Border>
+    <TabControl Grid.Row="1" Margin="18">
+      <TabItem Header="连接"><ScrollViewer><StackPanel Margin="24,20">
+        <TextBlock Text="连接与证书" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock TextWrapping="Wrap" Margin="0,12,0,0" LineHeight="22"
+                   Text="输入 iBMC 主机名、IP 或 HTTPS 地址。共享控制允许其他管理者同时查看；独占控制会请求独占通道。严格证书校验是默认行为。自签名证书必须先核对主题、颁发者、有效期和 SHA-256 指纹。持久服务器信任与导入的 CA 都只作用于显示的主机和端口，可在登录页的证书管理中撤销。" />
+        <TextBlock Text="断线恢复" FontSize="15" FontWeight="SemiBold" Margin="0,24,0,0" />
+        <TextBlock TextWrapping="Wrap" Margin="0,8,0,0" LineHeight="22"
+                   Text="瞬时网络故障会在固定次数和时限内自动重连。KVM 恢复成功后才会恢复原先已挂载的虚拟媒体；最终失败会保留明确状态，不会无限重试。" />
+      </StackPanel></ScrollViewer></TabItem>
+      <TabItem Header="输入"><ScrollViewer><StackPanel Margin="24,20">
+        <TextBlock Text="鼠标模式" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock TextWrapping="Wrap" Margin="0,12,0,0" LineHeight="22"
+                   Text="绝对模式把指针位置映射到远端画面；相对模式发送移动量；捕获模式用于单鼠标操作，单击画面开始捕获，按 Esc 释放。工具栏可控制本地指针显示并发送鼠标同步。分屏和监视会话始终只读。" />
+        <TextBlock Text="键盘" FontSize="15" FontWeight="SemiBold" Margin="0,24,0,0" />
+        <TextBlock TextWrapping="Wrap" Margin="0,8,0,0" LineHeight="22"
+                   Text="键盘只在远程画面获得焦点时发送。组合键菜单提供 Ctrl+Alt+Delete 等预设、自定义六键组合、键盘复位，以及美国、日语和法语布局。窗口失焦或切换刀片时会发送释放报告。" />
+      </StackPanel></ScrollViewer></TabItem>
+      <TabItem Header="录像"><ScrollViewer><StackPanel Margin="24,20">
+        <TextBlock Text="本地录像" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock TextWrapping="Wrap" Margin="0,12,0,0" LineHeight="22"
+                   Text="录像按钮可保存 .rep 格式录像，或导出标准 Motion JPEG AVI。AVI 必须在收到第一帧后开始。写盘与 JPEG 编码使用有界后台队列，不阻塞视频接收；磁盘错误和丢帧数会显示在控制台状态栏。切换刀片前当前录像会安全停止。" />
+      </StackPanel></ScrollViewer></TabItem>
+      <TabItem Header="电源"><ScrollViewer><StackPanel Margin="24,20">
+        <TextBlock Text="电源操作" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock TextWrapping="Wrap" Margin="0,12,0,0" LineHeight="22"
+                   Text="开机、正常关机、重启、强制断电重启和强制关机都作用于当前选中的控制刀片。每项操作都要求确认；强制操作可能造成数据丢失。账户权限或服务器拒绝会禁用相应按钮并显示具体原因。监视会话不能执行电源命令。" />
+      </StackPanel></ScrollViewer></TabItem>
+      <TabItem Header="虚拟媒体"><ScrollViewer><StackPanel Margin="24,20">
+        <TextBlock Text="虚拟软驱与光驱" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock TextWrapping="Wrap" Margin="0,12,0,0" LineHeight="22"
+                   Text="软驱支持镜像和物理驱动器，默认写保护；光驱支持 ISO、物理光驱和本地目录。目录会生成临时 Joliet ISO。软驱与光驱可同时挂载。关闭虚拟媒体窗口不会弹出介质；断开控制台会关闭 VMM 会话并清理临时镜像。USB 重置需要单独确认。" />
+      </StackPanel></ScrollViewer></TabItem>
+      <TabItem Header="机箱"><ScrollViewer><StackPanel Margin="24,20">
+        <TextBlock Text="刀片与分屏" FontSize="18" FontWeight="SemiBold" />
+        <TextBlock TextWrapping="Wrap" Margin="0,12,0,0" LineHeight="22"
+                   Text="机箱面板显示最多 14 个槽位的未安装、重置中、不支持 KVM、占用、SOL、固件加载和可连接状态。最多同时打开四路会话。标签页选择命令目标；监视模式和 2×2 分屏只显示画面，不接收键鼠。关闭单个刀片不会影响其他会话。" />
+      </StackPanel></ScrollViewer></TabItem>
+    </TabControl>
+    <Border Grid.Row="2" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0">
+      <Grid Margin="18,0" ColumnDefinitions="*,Auto">
+        <TextBlock Text="所有网络等待、解码和录像任务都在界面线程之外执行。"
+                   Foreground="{StaticResource MutedBrush}" FontSize="10" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Content="关于" VerticalAlignment="Center" Click="AboutButton_Click" />
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

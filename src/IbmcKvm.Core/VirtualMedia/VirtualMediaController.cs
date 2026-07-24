@@ -30,7 +30,7 @@ public sealed class VirtualMediaController : IAsyncDisposable
     public IReadOnlyList<PhysicalDriveDescriptor> EnumeratePhysicalDrives()
     {
         ThrowIfDisposed();
-        return OperatingSystem.IsWindows() ? PhysicalDriveMedia.Enumerate() : [];
+        return PhysicalDriveMedia.Enumerate();
     }
 
     public async Task<VirtualMediaCapability> QueryCapabilityAsync(CancellationToken cancellationToken = default)
@@ -71,11 +71,6 @@ public sealed class VirtualMediaController : IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
-        if (!OperatingSystem.IsWindows())
-        {
-            throw new PlatformNotSupportedException("Physical virtual media requires Windows.");
-        }
-
         var writable = descriptor.DeviceKind == MediaDeviceKind.Floppy && !writeProtected;
         return MountOwnedAsync(PhysicalDriveMedia.Open(descriptor, writable), cancellationToken);
     }
@@ -88,11 +83,6 @@ public sealed class VirtualMediaController : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(source);
         ThrowIfDisposed();
-        if (!OperatingSystem.IsWindows())
-        {
-            throw new PlatformNotSupportedException("Physical virtual media requires Windows.");
-        }
-
         await using var drive = PhysicalDriveMedia.Open(source);
         await MediaImageCreator.CreateAsync(drive, destinationPath, progress, cancellationToken: cancellationToken)
             .ConfigureAwait(false);

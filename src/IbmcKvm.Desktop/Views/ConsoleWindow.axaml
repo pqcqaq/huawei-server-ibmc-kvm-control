@@ -1,0 +1,278 @@
+<Window x:Class="IbmcKvm.Desktop.Views.ConsoleWindow"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="iBMC Remote Console" Width="1280" Height="800" MinWidth="980" MinHeight="540"
+        WindowStartupLocation="CenterScreen" Background="#090B0A"
+        Icon="avares://IbmcKvm.Desktop/Assets/IbmcKvm.ico">
+  <Grid x:Name="ConsoleRoot" Background="#090B0A">
+    <Border x:Name="VideoHost" Background="#050706" Focusable="True"
+            PointerEntered="VideoHost_PointerEntered"
+            PointerPressed="VideoHost_PointerPressed" PointerReleased="VideoHost_PointerReleased"
+            PointerMoved="VideoHost_PointerMoved" PointerWheelChanged="VideoHost_PointerWheelChanged"
+            LostFocus="VideoHost_LostFocus">
+      <Grid>
+        <Image x:Name="RemoteImage" Stretch="Uniform" />
+        <Grid x:Name="SplitVideoGrid" IsVisible="False" Background="#090B0A" IsHitTestVisible="False" />
+
+        <Border x:Name="ViewerOverlay" Background="#F2090B0A" IsHitTestVisible="False">
+          <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+            <ProgressBar IsIndeterminate="True" Width="180" Height="4" />
+            <TextBlock x:Name="OverlayText" Text="正在等待远程画面" FontWeight="SemiBold" FontSize="18"
+                       Foreground="#DCE4E0" HorizontalAlignment="Center" Margin="0,14,0,0" />
+            <TextBlock x:Name="ConnectedEndpointText" Foreground="#7F8D86" FontSize="11"
+                       HorizontalAlignment="Center" Margin="0,6,0,0" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="statusPill" HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                Margin="12" IsHitTestVisible="False">
+          <StackPanel Orientation="Horizontal">
+            <Ellipse x:Name="InputStatusDot" Width="9" Height="9" Fill="#77827D" Margin="0,0,7,0" />
+            <TextBlock x:Name="InputStatusText" Text="已连接，等待视频" VerticalAlignment="Center"
+                       Foreground="#E1E8E4" FontSize="10" MaxWidth="220" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="statusPill" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                Margin="12" IsHitTestVisible="False">
+          <TextBlock x:Name="VideoMetricsText" Text="无视频信号" Foreground="#DDE5E1" FontSize="10"
+                     MaxWidth="180" TextTrimming="CharacterEllipsis" />
+        </Border>
+
+        <Border x:Name="StatusMessageBorder" HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                Margin="0,11,0,11" Background="#E8193028" BorderBrush="#159B65"
+                BorderThickness="1" CornerRadius="4" Padding="38,7" IsHitTestVisible="False">
+          <TextBlock x:Name="StatusMessageText" Text="已连接" Foreground="#E8EFEB" FontSize="10"
+                     MaxWidth="300" TextTrimming="CharacterEllipsis" />
+        </Border>
+      </Grid>
+    </Border>
+
+    <Border x:Name="BladeTabsBar" HorizontalAlignment="Center" VerticalAlignment="Top"
+            Margin="0,72,0,0" Padding="4" Background="{StaticResource ToolbarBrush}"
+            BorderBrush="{StaticResource ToolbarLineBrush}" BorderThickness="1" CornerRadius="4"
+            ZIndex="24" IsVisible="False">
+      <ListBox x:Name="BladeTabsList" Background="Transparent" BorderThickness="0"
+               SelectionChanged="BladeTabsList_SelectionChanged"
+               ScrollViewer.HorizontalScrollBarVisibility="Auto"
+               ScrollViewer.VerticalScrollBarVisibility="Disabled">
+        <ListBox.ItemsPanel>
+          <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+        </ListBox.ItemsPanel>
+        <ListBox.ItemTemplate>
+          <DataTemplate>
+            <StackPanel Margin="7,2" MinWidth="64">
+              <TextBlock Text="{Binding Name}" Foreground="#EDF2EF" FontSize="11" HorizontalAlignment="Center" />
+              <TextBlock Text="{Binding Status}" Foreground="#9DAAA4" FontSize="9" HorizontalAlignment="Center" />
+            </StackPanel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </Border>
+
+    <Border x:Name="ChassisPanel" Width="268" HorizontalAlignment="Left" VerticalAlignment="Stretch"
+            Margin="12,72,0,56" Padding="10" Background="#F51A211E"
+            BorderBrush="{StaticResource ToolbarLineBrush}" BorderThickness="1" CornerRadius="4"
+            ZIndex="26" IsVisible="False">
+      <Grid RowDefinitions="Auto,*,Auto">
+        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+          <TextBlock Text="机箱刀片" Foreground="#EDF2EF" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Classes="tool" Width="34" Height="30" MinWidth="34" MinHeight="30"
+                  Click="RefreshChassisButton_Click" ToolTip.Tip="刷新机箱状态">
+            <PathIcon Classes="toolbarIcon" Data="{StaticResource IconSync}" Width="16" Height="16" />
+          </Button>
+        </Grid>
+        <ListBox x:Name="ChassisBladeList" Grid.Row="1" Background="#101512"
+                 BorderBrush="#3D4944" BorderThickness="1"
+                 SelectionChanged="ChassisBladeList_SelectionChanged">
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <Grid MinHeight="42" Margin="5,3" ColumnDefinitions="70,*">
+                <TextBlock Text="{Binding Name}" Foreground="#E4EBE7" FontSize="11" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding Status}" Foreground="#AEBAB4" FontSize="10" />
+                  <TextBlock Text="{Binding Detail}" Foreground="#75827C" FontSize="9" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+          <Button x:Name="MonitorBladeButton" Classes="tool" Click="MonitorBladeButton_Click"
+                  ToolTip.Tip="只读监视选中刀片" IsEnabled="False">
+            <PathIcon Classes="toolbarIcon" Data="{StaticResource IconMonitor}" />
+          </Button>
+          <Button x:Name="ConnectBladeButton" Classes="tool" Click="ConnectBladeButton_Click"
+                  ToolTip.Tip="控制选中刀片" IsEnabled="False">
+            <PathIcon Classes="toolbarIcon" Data="{StaticResource IconConnect}" />
+          </Button>
+          <Button x:Name="DisconnectBladeButton" Classes="tool" Click="DisconnectBladeButton_Click"
+                  ToolTip.Tip="关闭当前刀片会话" IsEnabled="False">
+            <PathIcon Classes="toolbarIcon" Data="{StaticResource IconDisconnect}" Foreground="#F08B83" />
+          </Button>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <Border x:Name="ToolbarRevealZone" Height="18" VerticalAlignment="Top"
+            Background="Transparent" ZIndex="40" PointerEntered="ToolbarRevealZone_PointerEntered">
+      <Border x:Name="ToolbarHiddenHandle" Width="120" Height="7" VerticalAlignment="Top"
+              Margin="0,5,0,0" Background="{StaticResource AccentBrush}" BorderBrush="#8FE0BC"
+              BorderThickness="1" CornerRadius="4" IsVisible="False" IsHitTestVisible="False" />
+    </Border>
+
+    <Border x:Name="FloatingToolbar" HorizontalAlignment="Center" VerticalAlignment="Top"
+            Margin="0,14,0,0" Padding="5" Background="{StaticResource ToolbarBrush}"
+            BorderBrush="{StaticResource ToolbarLineBrush}" BorderThickness="1" CornerRadius="4"
+            ZIndex="30" PointerEntered="FloatingToolbar_PointerEntered"
+            PointerExited="FloatingToolbar_PointerExited">
+      <StackPanel x:Name="ConsoleToolbarItems" Orientation="Horizontal">
+        <ToggleButton x:Name="PinToolbarButton" Classes="tool" IsChecked="True"
+                      Click="PinToolbarButton_Click" ToolTip.Tip="取消固定，鼠标离开后自动隐藏">
+          <PathIcon Classes="toolbarIcon" Data="{StaticResource IconPin}" />
+        </ToggleButton>
+
+        <Button x:Name="ChassisButton" Classes="tool" Click="ChassisButton_Click"
+                ToolTip.Tip="机箱与刀片" IsVisible="False">
+          <PathIcon Classes="toolbarIcon" Data="{StaticResource IconChassis}" />
+        </Button>
+        <ToggleButton x:Name="SplitViewButton" Classes="tool" Click="SplitViewButton_Click"
+                      ToolTip.Tip="四路只读分屏" IsVisible="False">
+          <PathIcon Classes="toolbarIcon" Data="{StaticResource IconSplit}" />
+        </ToggleButton>
+
+        <Button x:Name="MouseModeButton" Classes="tool" Click="ContextMenuButton_Click"
+                AutomationProperties.AutomationId="MouseModeButton" ToolTip.Tip="鼠标模式：绝对">
+          <Button.ContextMenu>
+            <ContextMenu>
+              <MenuItem Header="绝对" Tag="Absolute" ToggleType="CheckBox" IsChecked="True" Click="MouseModeMenuItem_Click" />
+              <MenuItem Header="相对" Tag="Relative" ToggleType="CheckBox" Click="MouseModeMenuItem_Click" />
+              <MenuItem Header="捕获" Tag="Captured" ToggleType="CheckBox" Click="MouseModeMenuItem_Click" />
+            </ContextMenu>
+          </Button.ContextMenu>
+          <PathIcon Classes="toolbarIcon" Data="{StaticResource IconMouse}" />
+        </Button>
+        <ToggleButton x:Name="ShowLocalPointerButton" Classes="tool" IsChecked="True"
+                      Click="ShowLocalPointerButton_Click" AutomationProperties.AutomationId="ShowLocalPointerButton"
+                      ToolTip.Tip="隐藏本地鼠标指针">
+          <PathIcon Classes="toolbarIcon" Data="{StaticResource IconMouse}" />
+        </ToggleButton>
+        <Button x:Name="SynchronizeMouseButton" Classes="tool" Click="SynchronizeMouseButton_Click"
+                AutomationProperties.AutomationId="SynchronizeMouseButton" ToolTip.Tip="同步远端鼠标位置">
+          <PathIcon Classes="toolbarIcon" Data="{StaticResource IconSync}" />
+        </Button>
+
+        <Button x:Name="VideoQualityButton" Classes="tool" Click="ContextMenuButton_Click"
+                AutomationProperties.AutomationId="VideoQualityButton" ToolTip.Tip="图像清晰度：中 70">
+          <Button.ContextMenu>
+            <ContextMenu>
+              <MenuItem Header="低 40" Tag="40" ToggleType="CheckBox" Click="VideoQualityMenuItem_Click" />
+              <MenuItem Header="低 50" Tag="50" ToggleType="CheckBox" Click="VideoQualityMenuItem_Click" />
+              <MenuItem Header="中 60" Tag="60" ToggleType="CheckBox" Click="VideoQualityMenuItem_Click" />
+              <MenuItem Header="中 70" Tag="70" ToggleType="CheckBox" IsChecked="True" Click="VideoQualityMenuItem_Click" />
+              <MenuItem Header="高 80" Tag="80" ToggleType="CheckBox" Click="VideoQualityMenuItem_Click" />
+              <MenuItem Header="高 90" Tag="90" ToggleType="CheckBox" Click="VideoQualityMenuItem_Click" />
+            </ContextMenu>
+          </Button.ContextMenu>
+          <PathIcon Classes="toolbarIcon" Data="{StaticResource IconImage}" />
+        </Button>
+        <Button x:Name="ColorDepthButton" Classes="tool" Click="ContextMenuButton_Click"
+                AutomationProperties.AutomationId="ColorDepthButton" ToolTip.Tip="颜色位数：4-bit">
+          <Button.ContextMenu>
+            <ContextMenu>
+              <MenuItem Header="8-bit" Tag="2" ToggleType="CheckBox" Click="ColorDepthMenuItem_Click" />
+              <MenuItem Header="7-bit" Tag="1" ToggleType="CheckBox" Click="ColorDepthMenuItem_Click" />
+              <MenuItem Header="6-bit" Tag="0" ToggleType="CheckBox" Click="ColorDepthMenuItem_Click" />
+              <MenuItem Header="4-bit" Tag="3" ToggleType="CheckBox" IsChecked="True" Click="ColorDepthMenuItem_Click" />
+            </ContextMenu>
+          </Button.ContextMenu>
+          <PathIcon Classes="toolbarIcon" Data="{StaticResource IconPalette}" />
+        </Button>
+
+        <Border Width="1" Height="24" Background="{StaticResource ToolbarLineBrush}" Margin="5,8" />
+
+        <Button x:Name="VirtualMediaButton" Classes="tool" Click="VirtualMediaButton_Click"
+                AutomationProperties.AutomationId="VirtualMediaButton" ToolTip.Tip="虚拟软驱与虚拟光驱">
+          <PathIcon Classes="toolbarIcon" Data="{StaticResource IconDisc}" />
+        </Button>
+        <Button x:Name="RecordButton" Classes="tool" Click="RecordButton_Click" ToolTip.Tip="开始本地录像">
+          <PathIcon Classes="toolbarIcon" Data="{StaticResource IconRecord}" Foreground="#F0C674" />
+        </Button>
+        <Button x:Name="ScreenshotButton" Classes="tool" IsEnabled="False" Click="ScreenshotButton_Click"
+                AutomationProperties.AutomationId="ScreenshotButton" ToolTip.Tip="保存当前画面">
+          <PathIcon Classes="toolbarIcon" Data="{StaticResource IconCamera}" />
+        </Button>
+        <Button x:Name="KeyboardMenuButton" Classes="tool" Click="ContextMenuButton_Click"
+                AutomationProperties.AutomationId="KeyboardMenuButton" ToolTip.Tip="组合键与键盘布局">
+          <Button.ContextMenu>
+            <ContextMenu>
+              <MenuItem Header="Ctrl + Shift" Tag="CtrlShift" Click="PresetCombinationMenuItem_Click" />
+              <MenuItem Header="Ctrl + Esc" Tag="CtrlEscape" Click="PresetCombinationMenuItem_Click" />
+              <MenuItem Header="Ctrl + Alt + Delete" Tag="CtrlAltDelete" Click="PresetCombinationMenuItem_Click" />
+              <MenuItem Header="Alt + Tab" Tag="AltTab" Click="PresetCombinationMenuItem_Click" />
+              <MenuItem Header="Ctrl + Space" Tag="CtrlSpace" Click="PresetCombinationMenuItem_Click" />
+              <Separator />
+              <MenuItem Header="自定义组合键…" Click="CustomCombinationMenuItem_Click" />
+              <MenuItem Header="重置远端键盘" Tag="KeyboardReset" Click="PresetCombinationMenuItem_Click" />
+              <Separator />
+              <MenuItem Header="键盘布局">
+                <MenuItem x:Name="UsKeyboardMenuItem" Header="English (US)" Tag="UnitedStates"
+                          ToggleType="CheckBox" IsChecked="True" Click="KeyboardLayoutMenuItem_Click" />
+                <MenuItem x:Name="JapaneseKeyboardMenuItem" Header="日本語" Tag="Japanese"
+                          ToggleType="CheckBox" Click="KeyboardLayoutMenuItem_Click" />
+                <MenuItem x:Name="FrenchKeyboardMenuItem" Header="Français" Tag="French"
+                          ToggleType="CheckBox" Click="KeyboardLayoutMenuItem_Click" />
+              </MenuItem>
+            </ContextMenu>
+          </Button.ContextMenu>
+          <PathIcon Classes="toolbarIcon" Data="{StaticResource IconKeyboard}" />
+        </Button>
+
+        <Grid Width="58" Height="30" Margin="2,5" ColumnDefinitions="*,*,*" ToolTip.Tip="远端 Num/Caps/Scroll Lock 状态">
+          <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+            <TextBlock Text="N" FontSize="8" Foreground="#AAB4AF" HorizontalAlignment="Center" />
+            <Ellipse x:Name="NumLockIndicator" Width="7" Height="7" Fill="#59635F" Margin="0,3,0,0" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+            <TextBlock Text="C" FontSize="8" Foreground="#AAB4AF" HorizontalAlignment="Center" />
+            <Ellipse x:Name="CapsLockIndicator" Width="7" Height="7" Fill="#59635F" Margin="0,3,0,0" />
+          </StackPanel>
+          <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+            <TextBlock Text="S" FontSize="8" Foreground="#AAB4AF" HorizontalAlignment="Center" />
+            <Ellipse x:Name="ScrollLockIndicator" Width="7" Height="7" Fill="#59635F" Margin="0,3,0,0" />
+          </StackPanel>
+        </Grid>
+        <Button x:Name="ReleaseKeysButton" Classes="tool" Click="ReleaseKeysButton_Click" ToolTip.Tip="释放全部远程按键">
+          <PathIcon Classes="toolbarIcon" Data="{StaticResource IconRelease}" />
+        </Button>
+        <Button x:Name="FullscreenButton" Classes="tool" Click="FullscreenButton_Click" ToolTip.Tip="切换全屏">
+          <PathIcon Classes="toolbarIcon" Data="{StaticResource IconFullscreen}" />
+        </Button>
+        <Button x:Name="PowerMenuButton" Classes="tool" Click="ContextMenuButton_Click"
+                AutomationProperties.AutomationId="PowerMenuButton" ToolTip.Tip="电源操作">
+          <Button.ContextMenu>
+            <ContextMenu>
+              <MenuItem Header="开机" Tag="PowerOn" Click="PowerMenuItem_Click" />
+              <MenuItem Header="正常关机" Tag="GracefulPowerOff" Click="PowerMenuItem_Click" />
+              <Separator />
+              <MenuItem Header="重启" Tag="Restart" Click="PowerMenuItem_Click" />
+              <MenuItem Header="强制断电重启" Tag="ForcedPowerCycle" Click="PowerMenuItem_Click" />
+              <MenuItem Header="强制关机" Tag="PowerOff" Click="PowerMenuItem_Click" />
+            </ContextMenu>
+          </Button.ContextMenu>
+          <PathIcon Classes="toolbarIcon" Data="{StaticResource IconPower}" />
+        </Button>
+        <Button x:Name="HelpButton" Classes="tool" Click="HelpButton_Click" ToolTip.Tip="帮助与关于">
+          <PathIcon Classes="toolbarIcon" Data="{StaticResource IconHelp}" />
+        </Button>
+
+        <Border Width="1" Height="24" Background="{StaticResource ToolbarLineBrush}" Margin="5,8" />
+
+        <Button x:Name="DisconnectButton" Classes="tool" Click="DisconnectButton_Click"
+                AutomationProperties.AutomationId="DisconnectButton" ToolTip.Tip="关闭连接并返回登录">
+          <PathIcon Classes="toolbarIcon" Data="{StaticResource IconDisconnect}" Foreground="#F08B83" />
+        </Button>
+      </StackPanel>
+    </Border>
+  </Grid>
+</Window>

@@ -1,0 +1,41 @@
+<Window x:Class="IbmcKvm.Desktop.Views.CertificateDecisionWindow"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="确认服务器证书" Width="650" Height="510" MinWidth="620" MinHeight="480"
+        WindowStartupLocation="CenterOwner" Icon="avares://IbmcKvm.Desktop/Assets/IbmcKvm.ico">
+  <Grid RowDefinitions="72,*,64">
+    <Border Background="{StaticResource HeaderBrush}">
+      <StackPanel Orientation="Horizontal" Margin="22,0" VerticalAlignment="Center">
+        <PathIcon Data="{StaticResource IconKey}" Width="25" Height="25" Foreground="#F0C674" Margin="0,0,14,0" />
+        <StackPanel VerticalAlignment="Center">
+          <TextBlock Text="服务器证书需要确认" FontSize="17" FontWeight="SemiBold" Foreground="White" />
+          <TextBlock Text="核对指纹后再发送登录凭据" FontSize="10" Foreground="#AAB6B0" Margin="0,4,0,0" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <Grid Grid.Row="1" Margin="24,20" ColumnDefinitions="88,*"
+          RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+      <TextBlock Text="主题" Foreground="{StaticResource MutedBrush}" Margin="0,0,12,12" />
+      <TextBlock x:Name="SubjectText" Grid.Column="1" TextWrapping="Wrap" Margin="0,0,0,12" />
+      <TextBlock Grid.Row="1" Text="颁发者" Foreground="{StaticResource MutedBrush}" Margin="0,0,12,12" />
+      <TextBlock x:Name="IssuerText" Grid.Row="1" Grid.Column="1" TextWrapping="Wrap" Margin="0,0,0,12" />
+      <TextBlock Grid.Row="2" Text="有效期" Foreground="{StaticResource MutedBrush}" Margin="0,0,12,12" />
+      <TextBlock x:Name="ValidityText" Grid.Row="2" Grid.Column="1" Margin="0,0,0,12" />
+      <TextBlock Grid.Row="3" Text="验证状态" Foreground="{StaticResource MutedBrush}" Margin="0,0,12,12" />
+      <TextBlock x:Name="PolicyText" Grid.Row="3" Grid.Column="1" TextWrapping="Wrap" Margin="0,0,0,12" />
+      <TextBlock Grid.Row="4" Text="SHA-256" Foreground="{StaticResource MutedBrush}" Margin="0,0,12,0" />
+      <TextBox x:Name="FingerprintText" Grid.Row="4" Grid.Column="1" IsReadOnly="True"
+               FontFamily="Cascadia Mono, monospace" FontSize="11" TextWrapping="Wrap" Height="76" />
+    </Grid>
+
+    <Border Grid.Row="2" BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0">
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center"
+                  Margin="20,0" Spacing="8">
+        <Button Content="取消" MinWidth="82" Click="CancelButton_Click" />
+        <Button Content="仅本次信任" MinWidth="110" Click="TrustSessionButton_Click" />
+        <Button Content="记住此服务器" Classes="primary" MinWidth="118" Click="TrustServerButton_Click" />
+      </StackPanel>
+    </Border>
+  </Grid>
+</Window>

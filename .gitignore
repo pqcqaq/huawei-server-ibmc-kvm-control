@@ -6,6 +6,8 @@ TestResults/
 artifacts/
 .artifacts/
 publish/
+__pycache__/
+*.py[cod]
 *.user
 *.suo
 *.pfx

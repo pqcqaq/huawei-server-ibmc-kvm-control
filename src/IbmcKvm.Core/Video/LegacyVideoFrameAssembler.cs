@@ -25,6 +25,8 @@ public sealed class LegacyVideoFrameAssembler
     private readonly int maximumFrameBytes;
     private readonly Dictionary<byte, PendingFrame> pending = [];
     private readonly Queue<byte> insertionOrder = [];
+    private byte lastFrameNumber;
+    private bool hasLastFrame;
 
     public LegacyVideoFrameAssembler(int maximumFrameBytes = 16 * 1024 * 1024)
     {
@@ -102,6 +104,15 @@ public sealed class LegacyVideoFrameAssembler
 
         frame = Complete(state);
         Drop(frameNumber);
+        if (frame.IsDifference &&
+            (!hasLastFrame || unchecked((byte)(lastFrameNumber + 1)) != frame.FrameNumber))
+        {
+            Reset();
+            throw new InvalidDataException("A difference frame does not follow the last decoded frame.");
+        }
+
+        lastFrameNumber = frame.FrameNumber;
+        hasLastFrame = true;
         return true;
     }
 
@@ -109,6 +120,8 @@ public sealed class LegacyVideoFrameAssembler
     {
         pending.Clear();
         insertionOrder.Clear();
+        lastFrameNumber = 0;
+        hasLastFrame = false;
     }
 
     private static EncodedVideoFrame Complete(PendingFrame state)

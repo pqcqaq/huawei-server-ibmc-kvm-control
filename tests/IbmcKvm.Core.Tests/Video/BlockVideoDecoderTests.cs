@@ -1,6 +1,6 @@
 using IbmcKvm.Core.Video;
 
-namespace IbmcKvm.App.Tests.Video;
+namespace IbmcKvm.Core.Tests.Video;
 
 public sealed class BlockVideoDecoderTests
 {
